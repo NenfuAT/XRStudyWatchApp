@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Copyright 2021 Google LLC
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<resources>
+    <string translatable="false" name="app_name">XRStudyWatch</string>
+    <string translatable="false" name="depth_use_explanation">対応デバイスでDepthを有効にすると、仮想オブジェクトが奥行きに対応します</string>
+    <string translatable="false" name="button_text_enable_depth">有効にする</string>
+    <string translatable="false" name="button_text_disable_depth">無効にする</string>
+    <string translatable="false" name="options_title_with_depth">あなたの端末はdepthをサポートしています</string>
+    <string translatable="false" name="options_title_without_depth">あなたの端末はdepthをサポートしていません</string>
+    <string translatable="false" name="done">Done</string>
+    <string-array translatable="false" name="depth_options_array">
+        <item>Enable depth</item>
+        <item>Show depth map</item>
+    </string-array>
+    <string translatable="false" name="options_title_instant_placement">Instant Placement options</string>
+    <string-array translatable="false" name="instant_placement_options_array">
+        <item>Enable Instant Placement</item>
+    </string-array>
+
+    <string translatable="false" name="searching_planes">平面を探しています...</string>
+    <string translatable="false" name="waiting_taps">平面をタップしてオブジェクトを設置します</string>
+
+</resources>
