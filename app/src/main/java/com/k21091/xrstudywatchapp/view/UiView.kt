@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 
 
 class UiView {
+    private val parts = UiParts(this)
     val uploadButtonChecked = mutableStateOf(false)
 
     val nearObjectButtonChecked = mutableStateOf(false)
@@ -40,7 +41,6 @@ class UiView {
     }
     @Composable
     fun Buttonlayout() {
-        val parts = UiParts(this)
 
         Box(
             modifier = Modifier
@@ -53,12 +53,21 @@ class UiView {
                 verticalAlignment = Alignment.Top,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 20.dp, vertical = 20.dp)
                     .background(color = Color.Transparent)
             ) {
                 parts.UploadMenuButton()
                 parts.NearObjectMenuButton()
             }
+        }
+    }
+    @Composable
+    fun Menulayout(){
+        if (uploadButtonChecked.value){
+            parts.UploadMenu()
+        }
+        if (nearObjectButtonChecked.value){
+            //parts.NearObjectMenu()
         }
     }
 }
