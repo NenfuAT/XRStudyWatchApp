@@ -31,6 +31,8 @@ import com.k21091.xrstudywatchapp.ar.samplerender.SampleRender
 import com.k21091.xrstudywatchapp.ar.kotlin.ArRenderer
 import com.k21091.xrstudywatchapp.ar.kotlin.ArView
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
+import com.k21091.xrstudywatchapp.view.UiParts
+import com.k21091.xrstudywatchapp.view.UiView
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -48,7 +50,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        setContent {
+            MainView()
+        }
         // Setup ARCore session lifecycle helper and configuration.
         arCoreSessionHelper = ARCoreSessionLifecycleHelper(this)
         // If Session creation or Session.resume() fails, display a message and log detailed
@@ -58,11 +62,11 @@ class MainActivity : ComponentActivity() {
                 val message =
                     when (exception) {
                         is UnavailableUserDeclinedInstallationException ->
-                            "Please install Google Play Services for AR"
+                            "Google Play Services for ARをインストールしてください"
                         is UnavailableApkTooOldException -> "Please update ARCore"
                         is UnavailableSdkTooOldException -> "Please update this app"
-                        is UnavailableDeviceNotCompatibleException -> "This device does not support AR"
-                        is CameraNotAvailableException -> "Camera not available. Try restarting the app."
+                        is UnavailableDeviceNotCompatibleException -> "このデバイスはARに対応していません"
+                        is CameraNotAvailableException -> "カメラが動作していません.アプリを再起動してください"
                         else -> "Failed to create AR session: $exception"
                     }
                 Log.e(TAG, "ARCore threw an exception", exception)
@@ -80,9 +84,6 @@ class MainActivity : ComponentActivity() {
         view = ArView(this)
         lifecycle.addObserver(view)
         //setContentView(view.root)
-        setContent {
-            ARview()
-        }
 
         // Sets up an example renderer using our HelloARRenderer.
         SampleRender(
@@ -130,7 +131,7 @@ class MainActivity : ComponentActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, results)
         if (!CameraPermissionHelper.hasCameraPermission(this)) {
             // Use toast instead of snackbar here since the activity will exit.
-            Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG)
+            Toast.makeText(this, "このアプリはカメラ権限を必要とします", Toast.LENGTH_LONG)
                 .show()
             if (!CameraPermissionHelper.shouldShowRequestPermissionRationale(this)) {
                 // Permission denied with checking "Do not ask again".
@@ -152,13 +153,11 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun ARview() {
+    fun MainView() {
         XRStudyWatchAppTheme {
+            val ui = UiView()
             OpenGLView()
-            MyUI {
-
-            }
-            Greeting(name = "taro")
+            ui.Buttonlayout()
         }
     }
     @Composable
@@ -174,6 +173,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    @Preview(showBackground = true)
+    @Composable
+    fun MainPreview() {
+        MainView()
+    }
 }
 
 @Composable
@@ -183,11 +187,9 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
         modifier = modifier
     )
 }
-
-@Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
-    XRStudyWatchAppTheme {
-        Greeting("Android")
-    }
+@Preview
+fun UiPrevew(){
+    var ui = UiView()
+    ui.Buttonlayout()
 }
