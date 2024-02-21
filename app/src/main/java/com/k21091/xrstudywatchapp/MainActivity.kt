@@ -17,19 +17,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.ar.core.Config
 import com.google.ar.core.Session
-import com.google.ar.core.examples.kotlin.helloar.HelloArView
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableApkTooOldException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
-import com.k21091.xrstudywatchapp.kotlin.common.helpers.ARCoreSessionLifecycleHelper
-import com.k21091.xrstudywatchapp.common.helpers.CameraPermissionHelper
-import com.k21091.xrstudywatchapp.common.helpers.DepthSettings
-import com.k21091.xrstudywatchapp.common.helpers.FullScreenHelper
-import com.k21091.xrstudywatchapp.common.helpers.InstantPlacementSettings
-import com.k21091.xrstudywatchapp.common.samplerender.SampleRender
-import com.k21091.xrstudywatchapp.kotlin.ar.HelloArRenderer
+import com.k21091.xrstudywatchapp.ar.kotlin.common.helpers.ARCoreSessionLifecycleHelper
+import com.k21091.xrstudywatchapp.ar.helpers.CameraPermissionHelper
+import com.k21091.xrstudywatchapp.ar.helpers.DepthSettings
+import com.k21091.xrstudywatchapp.ar.helpers.FullScreenHelper
+import com.k21091.xrstudywatchapp.ar.helpers.InstantPlacementSettings
+import com.k21091.xrstudywatchapp.ar.samplerender.SampleRender
+import com.k21091.xrstudywatchapp.ar.kotlin.ArRenderer
+import com.k21091.xrstudywatchapp.ar.kotlin.ArView
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -38,11 +38,13 @@ class MainActivity : ComponentActivity() {
     }
 
     lateinit var arCoreSessionHelper: ARCoreSessionLifecycleHelper
-    lateinit var view: HelloArView
-    lateinit var renderer: HelloArRenderer
+    lateinit var view: ArView
+    lateinit var renderer: ArRenderer
 
-    val instantPlacementSettings = InstantPlacementSettings()
-    val depthSettings = DepthSettings()
+    val instantPlacementSettings =
+        InstantPlacementSettings()
+    val depthSettings =
+        DepthSettings()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,11 +73,11 @@ class MainActivity : ComponentActivity() {
         lifecycle.addObserver(arCoreSessionHelper)
 
         // Set up the Hello AR renderer.
-        renderer = HelloArRenderer(this)
+        renderer = ArRenderer(this)
         lifecycle.addObserver(renderer)
 
         // Set up Hello AR UI.
-        view = HelloArView(this)
+        view = ArView(this)
         lifecycle.addObserver(view)
         //setContentView(view.root)
         setContent {
@@ -83,7 +85,11 @@ class MainActivity : ComponentActivity() {
         }
 
         // Sets up an example renderer using our HelloARRenderer.
-        SampleRender(view.surfaceView, renderer, assets)
+        SampleRender(
+            view.surfaceView,
+            renderer,
+            assets
+        )
 
         depthSettings.onCreate(this)
         instantPlacementSettings.onCreate(this)
@@ -115,6 +121,7 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
@@ -151,6 +158,7 @@ class MainActivity : ComponentActivity() {
             MyUI {
 
             }
+            Greeting(name = "taro")
         }
     }
     @Composable
