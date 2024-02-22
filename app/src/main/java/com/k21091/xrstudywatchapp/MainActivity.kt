@@ -34,7 +34,6 @@ import com.k21091.xrstudywatchapp.ar.samplerender.SampleRender
 import com.k21091.xrstudywatchapp.ar.kotlin.ArRenderer
 import com.k21091.xrstudywatchapp.ar.kotlin.ArView
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
-import com.k21091.xrstudywatchapp.view.UiParts
 import com.k21091.xrstudywatchapp.view.UiView
 
 class MainActivity : ComponentActivity() {
@@ -156,26 +155,11 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun MainView() {
-        XRStudyWatchAppTheme {
-            val ui = UiView()
-            OpenGLView()
-            ui.Menulayout()
-            ui.Buttonlayout()
-        }
-    }
-    @Composable
-    fun MyUI(onButtonClick: () -> Unit) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Text(text = "Welcome to My App", modifier = Modifier.padding(bottom = 8.dp))
-            Button(onClick = { onButtonClick() }) {
-                Text(text = "Click Me!")
-            }
-        }
+    fun MainView() = XRStudyWatchAppTheme {
+        val ui = UiView()
+        OpenGLView()
+        ui.Menulayout()
+        ui.Buttonlayout()
     }
     @Preview(showBackground = true)
     @Composable
@@ -184,13 +168,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+
 @Composable
 @Preview
 fun UiPrevew(){
