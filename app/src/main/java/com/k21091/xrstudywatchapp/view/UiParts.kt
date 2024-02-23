@@ -3,7 +3,6 @@ package com.k21091.xrstudywatchapp.view
 import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.DraggableState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -30,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -119,9 +119,13 @@ class MenuParts(private val ui: UiView){
             contentAlignment = Alignment.Center){
             Column(
                 modifier = Modifier
-                    .fillMaxHeight(0.7f)
-                    .fillMaxWidth(0.8f)
+                    .fillMaxHeight(0.8f)
+                    .fillMaxWidth(0.9f)
             ){
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.04f))
                 Box(modifier = Modifier
                     .background(
                         color = Color.White.copy(alpha = 0.8f),
@@ -171,7 +175,7 @@ class MenuParts(private val ui: UiView){
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .fillMaxHeight(0.04f))
+                            .fillMaxHeight(0.02f))
                     if (ui.uploadButtonChecked.value) {
                         UploadMenu()
                     }
@@ -184,11 +188,10 @@ class MenuParts(private val ui: UiView){
                         contentAlignment = Alignment.Center
                     )
                     {
-                        Box (
+                        Box(
                             modifier = Modifier
-                                .fillMaxHeight(0.15f)
+                                .fillMaxHeight()
                                 .fillMaxWidth(0.35f)
-                                .background(Color(0xFF666666), RoundedCornerShape(15.dp))
                                 .draggable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     state = rememberDraggableState { delta ->
@@ -196,7 +199,7 @@ class MenuParts(private val ui: UiView){
                                         offsetY = proposedOffsetY.coerceIn(minOffsetY, maxOffsetY)
                                     },
                                     onDragStopped = {
-                                        if (offsetY < screenHeight * -0.6f) {
+                                        if (offsetY < screenHeight * -0.1f) {
                                             if (ui.uploadButtonChecked.value) {
                                                 ui.onUploadButtonClicked()
                                             }
@@ -208,9 +211,18 @@ class MenuParts(private val ui: UiView){
                                             offsetY = maxOffsetY
                                         }
                                     },
-                                    orientation = Orientation.Vertical,
-                                )
+                                    orientation = Orientation.Vertical
+                                ),
+                            contentAlignment = Alignment.Center
                         )
+                        {
+                            Box (
+                                modifier = Modifier
+                                    .fillMaxHeight(0.2f)
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF666666), RoundedCornerShape(15.dp)),
+                            )
+                        }
                     }
 
                 }
@@ -223,8 +235,8 @@ class MenuParts(private val ui: UiView){
     fun UploadMenu(){
         Column(
             modifier = Modifier
-                .fillMaxHeight(0.9f)
-                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.95f)
+                .fillMaxWidth(0.95f)
                 .border(2.dp, Color.Black, RoundedCornerShape(15.dp))
         ){
             //karamuyouso
@@ -234,8 +246,8 @@ class MenuParts(private val ui: UiView){
     fun NearObjectMenu(){
         LazyColumn(
             modifier = Modifier
-                .fillMaxHeight(0.9f)
-                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.95f)
+                .fillMaxWidth(0.95f)
         ){
             item() {
                 Box(
