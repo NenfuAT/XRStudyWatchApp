@@ -64,11 +64,8 @@ class UiView {
     }
     @Composable
     fun Menulayout(){
-        if (uploadButtonChecked.value){
-            Menus.UploadMenu()
-        }
-        if (nearObjectButtonChecked.value){
-            //Menus.NearObjectMenu()
+        if (uploadButtonChecked.value||nearObjectButtonChecked.value){
+            Menus.Menu()
         }
     }
 }

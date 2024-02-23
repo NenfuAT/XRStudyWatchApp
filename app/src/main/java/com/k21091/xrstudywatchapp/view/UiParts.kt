@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -106,12 +107,11 @@ class ButtonParts (private val ui: UiView) {
 class MenuParts(private val ui: UiView){
     @SuppressLint("NotConstructor")
     @Composable
-    fun UploadMenu(){
+    fun Menu(){
         val screenHeight = LocalContext.current.resources.displayMetrics.heightPixels
         val maxOffsetY =0f
         val minOffsetY =(screenHeight * -0.7f)
         var offsetY by remember { mutableStateOf(0f) }  //コンテンツのOffsetを変更する用
-
         Box(modifier = Modifier
             .fillMaxSize()
             .offset { IntOffset(0, offsetY.roundToInt()) }
@@ -131,15 +131,28 @@ class MenuParts(private val ui: UiView){
                     .fillMaxHeight(0.1f),
                     contentAlignment = Alignment.Center
                 ){
-                    AutoResizeText(
-                        modifier = Modifier
-                            .wrapContentHeight()
-                            .fillMaxWidth(0.95f),
-                        text = "オブジェクトをアップロード",
-                        fontSizeRange = FontSizeRange(min = 20.sp, max = 30.sp),
-                        textAlign = TextAlign.Center,
-                        maxLines = 1
-                    )
+                    if (ui.uploadButtonChecked.value){
+                        AutoResizeText(
+                            modifier = Modifier
+                                .wrapContentHeight()
+                                .fillMaxWidth(0.95f),
+                            text = "オブジェクトをアップロード",
+                            fontSizeRange = FontSizeRange(min = 20.sp, max = 30.sp),
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
+                    }
+                    if(ui.nearObjectButtonChecked.value){
+                        AutoResizeText(
+                            modifier = Modifier
+                                .wrapContentHeight()
+                                .fillMaxWidth(0.95f),
+                            text = "近くのオブジェクト",
+                            fontSizeRange = FontSizeRange(min = 20.sp, max = 30.sp),
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
+                    }
                 }
 
                 Box(
@@ -159,13 +172,11 @@ class MenuParts(private val ui: UiView){
                         modifier = Modifier
                             .fillMaxWidth()
                             .fillMaxHeight(0.04f))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxHeight(0.9f)
-                            .fillMaxWidth(0.9f)
-                            .border(2.dp, Color.Black, RoundedCornerShape(15.dp))
-                    ){
-                        //karamuyouso
+                    if (ui.uploadButtonChecked.value) {
+                        UploadMenu()
+                    }
+                    if (ui.nearObjectButtonChecked.value){
+                        NearObjectMenu()
                     }
                     Box(
                         modifier = Modifier
@@ -185,12 +196,17 @@ class MenuParts(private val ui: UiView){
                                         offsetY = proposedOffsetY.coerceIn(minOffsetY, maxOffsetY)
                                     },
                                     onDragStopped = {
-                                        if (offsetY<screenHeight * -0.6f){
-                                            ui.onUploadButtonClicked()
+                                        if (offsetY < screenHeight * -0.6f) {
+                                            if (ui.uploadButtonChecked.value) {
+                                                ui.onUploadButtonClicked()
                                             }
-                                        else{
+                                            if (ui.nearObjectButtonChecked.value) {
+                                                ui.onNearObjectButtonClicked()
+                                            }
+
+                                        } else {
                                             offsetY = maxOffsetY
-                                            }
+                                        }
                                     },
                                     orientation = Orientation.Vertical,
                                 )
@@ -200,6 +216,38 @@ class MenuParts(private val ui: UiView){
                 }
 
             }
+        }
+
+    }
+    @Composable
+    fun UploadMenu(){
+        Column(
+            modifier = Modifier
+                .fillMaxHeight(0.9f)
+                .fillMaxWidth(0.9f)
+                .border(2.dp, Color.Black, RoundedCornerShape(15.dp))
+        ){
+            //karamuyouso
+        }
+    }
+    @Composable
+    fun NearObjectMenu(){
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxHeight(0.9f)
+                .fillMaxWidth(0.9f)
+        ){
+            item() {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight(0.3f)
+                        .fillMaxWidth()
+                        .border(2.dp, Color.Black, RoundedCornerShape(15.dp))
+                ){
+
+                }
+            }
+
         }
     }
 }
