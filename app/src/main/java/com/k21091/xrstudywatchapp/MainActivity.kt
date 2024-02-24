@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
         depthSettings.onCreate(this)
         instantPlacementSettings.onCreate(this)
     }
+    val ui = UiView()
 
     // Configure the session, using Lighting Estimation, and Depth mode.
     fun configureSession(session: Session) {
@@ -156,7 +157,6 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MainView() = XRStudyWatchAppTheme {
-        val ui = UiView()
         OpenGLView()
         ui.Menulayout()
         ui.Buttonlayout()
@@ -166,19 +166,19 @@ class MainActivity : ComponentActivity() {
     fun MainPreview() {
         MainView()
     }
-}
+    @Composable
+    @Preview
+    fun UiPreview(){
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .background(color = Color.Black)
+        ){
 
-
-@Composable
-@Preview
-fun UiPrevew(){
-    val ui = UiView()
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .background(color = Color.Black)
-    ){
-
+        }
+        ui.Menulayout()
+        ui.Buttonlayout()
     }
-    ui.Menulayout()
-    ui.Buttonlayout()
+
 }
+
+

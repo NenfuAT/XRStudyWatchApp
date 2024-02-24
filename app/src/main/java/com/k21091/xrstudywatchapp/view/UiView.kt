@@ -1,6 +1,7 @@
 package com.k21091.xrstudywatchapp.view
 
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,9 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.k21091.xrstudywatchapp.MainActivity
 
 
-class UiView {
+class UiView (){
     private val Buttons = ButtonParts(this)
     private val Menus =MenuParts(this)
     val uploadButtonChecked = mutableStateOf(false)
