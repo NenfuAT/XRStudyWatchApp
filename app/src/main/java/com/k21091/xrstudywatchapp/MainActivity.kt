@@ -1,23 +1,27 @@
 package com.k21091.xrstudywatchapp
 
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
@@ -35,6 +39,8 @@ import com.k21091.xrstudywatchapp.ar.kotlin.ArRenderer
 import com.k21091.xrstudywatchapp.ar.kotlin.ArView
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
 import com.k21091.xrstudywatchapp.view.UiView
+import com.k21091.xrstudywatchapp.view.selectedImageBitmapState
+import java.io.IOException
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -45,6 +51,9 @@ class MainActivity : ComponentActivity() {
     lateinit var view: ArView
     lateinit var renderer: ArRenderer
 
+    //private var selectedImageBitmapState = mutableStateOf<ImageBitmap?>(null)
+    lateinit var getContent: ActivityResultLauncher<String>
+
     val instantPlacementSettings =
         InstantPlacementSettings()
     val depthSettings =
@@ -52,9 +61,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MainView()
+
+        // getContent を初期化する
+        getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            Log.d("MainActivity", "Selected image bitmap: $selectedImageBitmapState")
+            uri?.let { selectedImageBitmapState.value = uriToBitmap(it,this) }
         }
+
         // Setup ARCore session lifecycle helper and configuration.
         arCoreSessionHelper = ARCoreSessionLifecycleHelper(this)
         // If Session creation or Session.resume() fails, display a message and log detailed
@@ -96,8 +109,12 @@ class MainActivity : ComponentActivity() {
 
         depthSettings.onCreate(this)
         instantPlacementSettings.onCreate(this)
+
+        // setContent の後に配置する
+        setContent {
+            MainView()
+        }
     }
-    val ui = UiView()
 
     // Configure the session, using Lighting Estimation, and Depth mode.
     fun configureSession(session: Session) {
@@ -148,37 +165,37 @@ class MainActivity : ComponentActivity() {
         super.onWindowFocusChanged(hasFocus)
         FullScreenHelper.setFullScreenOnWindowFocusChanged(this, hasFocus)
     }
+
+    fun uriToBitmap(uri: Uri, activity: ComponentActivity): ImageBitmap? {
+        return try {
+            val inputStream = activity.contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            bitmap?.asImageBitmap()
+        } catch (e: IOException) {
+            e.printStackTrace()
+            null
+        }
+    }
     @Composable
     fun OpenGLView() {
-        AndroidView(factory = {
-            view.surfaceView
-        })
+        Box(modifier = Modifier.fillMaxSize()) {
+            AndroidView(factory = {
+                view.surfaceView
+            })
+        }
     }
 
     @Composable
     fun MainView() = XRStudyWatchAppTheme {
+        var ui=UiView(getContent)
         OpenGLView()
-        ui.Menulayout()
         ui.Buttonlayout()
+        ui.Menulayout()
     }
+
     @Preview(showBackground = true)
     @Composable
     fun MainPreview() {
         MainView()
     }
-    @Composable
-    @Preview
-    fun UiPreview(){
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .background(color = Color.Black)
-        ){
-
-        }
-        ui.Menulayout()
-        ui.Buttonlayout()
-    }
-
 }
-
-

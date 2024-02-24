@@ -1,10 +1,7 @@
 package com.k21091.xrstudywatchapp.view
 
 import android.annotation.SuppressLint
-import android.net.Uri
-import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +26,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,7 +41,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.k21091.xrstudywatchapp.MainActivity
 import com.k21091.xrstudywatchapp.R
 import kotlin.math.roundToInt
 
@@ -112,9 +109,8 @@ class ButtonParts(private val ui: UiView) {
     }
 }
 
-class MenuParts(private val ui: UiView) {
+class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<String>) {
     var SearchTextField = SearchTextField()
-
     @SuppressLint("NotConstructor")
     @Composable
     fun Menu() {
@@ -190,7 +186,7 @@ class MenuParts(private val ui: UiView) {
                             .fillMaxHeight(0.02f)
                     )
                     if (ui.uploadButtonChecked.value) {
-                        UploadMenu()
+                        UploadMenu(getContent)
                     }
                     if (ui.nearObjectButtonChecked.value) {
                         NearObjectMenu()
@@ -247,12 +243,14 @@ class MenuParts(private val ui: UiView) {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun UploadMenu() {
+    fun UploadMenu(
+        getContent: ActivityResultLauncher<String>
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight(0.95f)
                 .fillMaxWidth(0.95f)
-                .border(2.dp, Color.Black, RoundedCornerShape(15.dp)),
+                .border(2.dp, Color.Black, RoundedCornerShape(10.dp)),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(modifier = Modifier.weight(0.2f))
@@ -274,9 +272,9 @@ class MenuParts(private val ui: UiView) {
                     .fillMaxWidth(0.9f)
                     .background(
                         color = Color.Gray.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(5.dp)
+                        shape = RoundedCornerShape(10.dp)
                     )
-                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(5.dp))
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
             )
             Box(modifier = Modifier.weight(0.2f))
             AutoResizeText(
@@ -297,9 +295,9 @@ class MenuParts(private val ui: UiView) {
                     .fillMaxWidth(0.9f)
                     .background(
                         color = Color.Gray.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(5.dp)
+                        shape = RoundedCornerShape(10.dp)
                     )
-                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(5.dp))
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
             )
             Box(modifier = Modifier.weight(0.2f))
             AutoResizeText(
@@ -320,9 +318,9 @@ class MenuParts(private val ui: UiView) {
                     .fillMaxWidth(0.9f)
                     .background(
                         color = Color.Gray.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(5.dp)
+                        shape = RoundedCornerShape(10.dp)
                     )
-                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(5.dp))
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
             )
             Box(modifier = Modifier.weight(0.2f))
             AutoResizeText(
@@ -338,23 +336,39 @@ class MenuParts(private val ui: UiView) {
                 modifier = Modifier
                     .weight(5f)
                     .fillMaxWidth(0.9f)
-                    .background(color = Color.Gray.copy(alpha = 0.2f))
-                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(5.dp))
+                    .background(color = Color.Gray.copy(alpha = 0.2f),shape = RoundedCornerShape(10.dp))
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                    .clickable {
+                        getContent.launch("image/*")
+                    }
             )
             {
-
+                ImageSelectionScreen(selectedImageBitmapState.value)
             }
             Box(modifier = Modifier.weight(0.2f))
             Box(
                 modifier = Modifier
                     .weight(1.5f)
                     .fillMaxWidth(0.9f)
-                    .border(2.dp, Color.Black, RoundedCornerShape(15.dp))
+                    .background(color = Color.White.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color.Gray, RoundedCornerShape(10.dp))
                     .clickable
                     {
 
                     },
+                contentAlignment = Alignment.Center
             )
+            {
+                AutoResizeText(
+                    modifier = Modifier
+                        .fillMaxHeight(0.5f)
+                        .fillMaxWidth(0.3f),
+                    text = "NEXT",
+                    fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+            }
             Box(modifier = Modifier.weight(0.2f))
 
         }
@@ -372,7 +386,7 @@ class MenuParts(private val ui: UiView) {
                     modifier = Modifier
                         .fillMaxHeight(0.3f)
                         .fillMaxWidth()
-                        .border(2.dp, Color.Black, RoundedCornerShape(15.dp))
+
                 ) {
 
                 }

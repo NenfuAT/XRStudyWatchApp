@@ -44,7 +44,7 @@ class SearchTextField {
             modifier = modifier
                 .background(
                     color = Color.Gray.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(6.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ),
             enabled = enabled,
             readOnly = readOnly,
