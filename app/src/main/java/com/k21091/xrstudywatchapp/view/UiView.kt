@@ -35,6 +35,7 @@ class UiView (getContent: ActivityResultLauncher<String>){
         }
         uploadButtonChecked.value = !uploadButtonChecked.value
         selectedImageBitmapState.value=null
+        Menus.uploadpage=0
         Log.d("up", uploadButtonChecked.value.toString())
     }
 
