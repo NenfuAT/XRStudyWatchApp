@@ -400,6 +400,7 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
 
             }
         else if(uploadpage==1){
+            Box(modifier = Modifier.weight(0.1f))
             Box(modifier = Modifier
                 .weight(0.5f)
                 .fillMaxWidth(0.9f),
@@ -407,22 +408,22 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
             ){
                 AutoResizeText(
                     modifier = Modifier
-                        .fillMaxHeight(0.7f)
+                        .fillMaxHeight(0.9f)
                         .fillMaxWidth(),
-                    text = "1分間表示させたいエリアを歩いてください",
+                    text = "1分間表示させたいエリア\nを歩いてください",
                     fontSizeRange = FontSizeRange(min = 10.sp, max = 50.sp),
                     textAlign = TextAlign.Center,
-                    maxLines = 1
+                    maxLines = 2
                 )
             }
             Box(modifier = Modifier
-                .weight(1.5f)
+                .weight(0.7f)
                 .fillMaxWidth(0.9f),
                 contentAlignment = Alignment.Center
             ){
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight(0.9f)
+                        .fillMaxHeight(1f)
                         .aspectRatio(1f),
                     contentAlignment = Alignment.Center
                 ){
@@ -453,13 +454,14 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
 
             }
             Column(modifier = Modifier
-                .weight(2.5f)
+                .weight(1.5f)
                 .fillMaxWidth(0.9f),
                 horizontalAlignment = Alignment.CenterHorizontally
             )
 
 
             {
+                Box(modifier = Modifier.weight(0.05f))
                 CountDownCanvas(modifier = Modifier
                     .weight(1f)
                     .aspectRatio(1f))
@@ -526,7 +528,7 @@ fun CountDownCanvas(modifier: Modifier = Modifier) {
                     .fillMaxHeight(0.4f)
                     .fillMaxWidth(0.8f),
                 text = "finish",
-                fontSizeRange = FontSizeRange(min = 50.sp, max = 100.sp),
+                fontSizeRange = FontSizeRange(min = 30.sp, max = 80.sp),
                 textAlign = TextAlign.Center,
                 maxLines = 1
             )
