@@ -21,7 +21,7 @@ class Count1Min {
                 withContext(Dispatchers.Main) {
                     listener(elapsedMilliseconds)
                 }
-                delay(100)
+                //delay(100)
             }
             withContext(Dispatchers.Main) {
                 listener(60f * 1000) // Countdown finished, 60秒をミリ秒に変換

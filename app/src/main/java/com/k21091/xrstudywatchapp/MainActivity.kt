@@ -1,5 +1,6 @@
 package com.k21091.xrstudywatchapp
 
+import android.Manifest
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -40,6 +41,7 @@ import com.k21091.xrstudywatchapp.ar.kotlin.ArView
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
 import com.k21091.xrstudywatchapp.view.UiView
 import com.k21091.xrstudywatchapp.view.selectedImageBitmapState
+import pub.devrel.easypermissions.EasyPermissions
 import java.io.IOException
 
 class MainActivity : ComponentActivity() {
@@ -61,7 +63,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val permissions = arrayOf(
+            Manifest.permission.ACCESS_WIFI_STATE,
+            Manifest.permission.BLUETOOTH_ADMIN ,
+            Manifest.permission.BLUETOOTH,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_ADVERTISE,
+            Manifest.permission.NEARBY_WIFI_DEVICES,
+            Manifest.permission.BLUETOOTH_CONNECT
+        )
 
+        //許可したいpermissionを許可できるように
+        if (!EasyPermissions.hasPermissions(this, *permissions)) {
+            EasyPermissions.requestPermissions(this, "パーミッションに関する説明", 1, *permissions)
+        }
         // getContent を初期化する
         getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             Log.d("MainActivity", "Selected image bitmap: $selectedImageBitmapState")
