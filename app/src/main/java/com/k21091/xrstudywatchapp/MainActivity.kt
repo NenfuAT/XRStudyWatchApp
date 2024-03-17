@@ -204,8 +204,8 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MainView() = XRStudyWatchAppTheme {
-        var ui=UiView(getContent)
-        OpenGLView()
+        val ui=UiView(getContent)
+        //OpenGLView()
         ui.Buttonlayout()
         ui.Menulayout()
     }

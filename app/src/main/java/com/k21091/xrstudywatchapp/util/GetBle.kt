@@ -1,82 +1,56 @@
-package com.k21091.xrstudywatchapp.util
-
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
 import android.content.Context
+import android.os.Handler
 import android.util.Log
-import org.altbeacon.beacon.Beacon
-import org.altbeacon.beacon.BeaconManager
-import org.altbeacon.beacon.BeaconParser
-import org.altbeacon.beacon.MonitorNotifier
-import org.altbeacon.beacon.RangeNotifier
-import org.altbeacon.beacon.Region
-import java.util.Timer
-import java.util.TimerTask
 
-class GetBle(context: Context) : RangeNotifier, MonitorNotifier {
+class GetBLE{
+    private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+    private val bluetoothLeScanner: BluetoothLeScanner? = bluetoothAdapter?.bluetoothLeScanner
+    private val handler = Handler()
 
-    private var beaconManager: BeaconManager = BeaconManager.getInstanceForApplication(context)
-    private lateinit var mRegion: Region
-    private val scannedBeacons: MutableList<String> = mutableListOf()
-    private var callback: ((List<String>) -> Unit)? = null
+    private val SCAN_PERIOD: Long = 5000
+    private var results = mutableListOf<String>()
+    private var scanCallback: ScanCallback? = null
 
-    fun onBeaconServiceConnect() {
-        mRegion = Region("iBeacon", null, null, null)
-        val IBEACON_FORMAT = "m:2-3=0215,i:4-19,i:20-21,i:22-23,p:24-24"
-        val ALTBEACON_FORMAT = BeaconParser().setBeaconLayout(BeaconParser.ALTBEACON_LAYOUT)
-        val EDDYSTONE_FORMAT = BeaconParser().setBeaconLayout(BeaconParser.EDDYSTONE_UID_LAYOUT)
-        beaconManager.beaconParsers.add(BeaconParser().setBeaconLayout(IBEACON_FORMAT))
-        beaconManager.beaconParsers.add(ALTBEACON_FORMAT)
-        beaconManager.beaconParsers.add(EDDYSTONE_FORMAT)
-    }
+    fun startScan(count:Int,callback: (List<String>) -> Unit) {
+        bluetoothLeScanner?.let { scanner ->
+            if (scanCallback == null) {
+                results.clear() // スキャンが開始される前に結果をクリア
+                scanCallback = object : ScanCallback() {
+                    override fun onScanResult(callbackType: Int, result: ScanResult) {
+                        super.onScanResult(callbackType, result)
+                        val uuids = result.scanRecord?.serviceUuids
+                        val receiveRssi = result.rssi
+                        uuids?.forEach { uuid ->
+                            val uuidString = uuid.uuid.toString()
+                            results.add("$count,$uuidString,$receiveRssi")
+                        }
+                    }
 
-    fun startScanning(callback: (List<String>) -> Unit) {
-        this.callback = callback
-        if (!::mRegion.isInitialized) {
-            // mRegion が初期化されていない場合、onBeaconServiceConnect() を呼び出して初期化する
-            onBeaconServiceConnect()
-        }
-        beaconManager.addMonitorNotifier(this)
-        beaconManager.addRangeNotifier(this)
-        beaconManager.startMonitoring(mRegion)
-        beaconManager.startRangingBeacons(mRegion)
-
-        // 2秒後にスキャンを停止し、データを返す
-        Timer().schedule(object : TimerTask() {
-            override fun run() {
-                stopScanning()
-                callback(scannedBeacons.toList())
-                scannedBeacons.clear()
+                    override fun onScanFailed(errorCode: Int) {
+                        super.onScanFailed(errorCode)
+                        Log.e("GetBLE", "Scan failed with error code $errorCode")
+                    }
+                }
+                scanner.startScan(scanCallback)
+                handler.postDelayed({
+                    stopScan()
+                    callback(results) // スキャンが終了した後にコールバックで結果を返す
+                }, SCAN_PERIOD)
+                Log.d("GetBLE", "Batch scan started")
+            } else {
+                Log.d("GetBLE", "Scan already running")
             }
-        }, 2000)
-    }
-
-    fun stopScanning() {
-        beaconManager.stopMonitoring(mRegion)
-        beaconManager.stopRangingBeacons(mRegion)
-    }
-
-    fun onDestroy() {
-        beaconManager.stopMonitoring(mRegion)
-        beaconManager.stopRangingBeacons(mRegion)
-    }
-
-    override fun didEnterRegion(region: Region?) {
-        //Log.d("iBeacon", "Enter Region ${region?.uniqueId}")
-    }
-
-    override fun didExitRegion(region: Region?) {
-        //Log.d("iBeacon", "Exit Region ${region?.uniqueId}")
-    }
-
-    override fun didRangeBeaconsInRegion(beacons: MutableCollection<Beacon>?, region: Region?) {
-        Log.d("BleCentral", "Detected Beacons:")
-        beacons?.forEach { beacon ->
-            val beaconString = "${beacon.id1},${beacon.rssi},ble"
-            //Log.d("BleCentral", beaconString)
-            scannedBeacons.add(beaconString) // スキャンしたビーコンをリストに追加
         }
     }
 
-    override fun didDetermineStateForRegion(state: Int, region: Region?) {
-        Log.d("BleCentral", "Determine State: $state")
+    private fun stopScan() {
+        scanCallback?.let { bluetoothLeScanner?.stopScan(it) }
+        scanCallback = null
+        Log.d("GetBLE", "Batch scan stopped")
     }
 }
+

@@ -1,31 +1,35 @@
 package com.k21091.xrstudywatchapp.util
 
+import GetBLE
 import GetWiFi
 import android.content.Context
 
 class CreateCsv(context: Context)  {
-    var GetBle= GetBle(context)
+    var GetBle= GetBLE()
     var GetWiFi=GetWiFi(context)
     var OtherFileStorage=OtherFileStorage(context,"${System.currentTimeMillis()}")
     var BleData=mutableListOf<String>()
     var WifiData=mutableListOf<String>()
-    fun createcsvdata(count: Int, callback: () -> Unit) {
-        GetBle.startScanning { bleResults ->
-            bleResults.forEach {
-                BleData.add("$count,$it")
+    var count=0
+    fun createcsvdata(completion: () -> Unit) {
+        if (count < 5) {
+            GetBle.startScan(count){bleResults->
+                BleData.addAll(bleResults)
+                val wifiResults = GetWiFi.getResults()
+                for (result in wifiResults) {
+                    val bssid = result.BSSID
+                    val level = result.level
+                    WifiData.add("$count,$bssid,$level")
+                }
+                count++
+                createcsvdata(completion) // 再帰的に次のスキャンを実行
             }
-
-            val wifiResults = GetWiFi.getResults()
-            for (result in wifiResults) {
-                val bssid = result.BSSID
-                val level = result.level
-                WifiData.add("$count,$bssid,$level,wifi")
-            }
-
-            // 処理が完了したらコールバックを呼び出す
-            callback()
+        } else {
+            completion() // 5回のスキャンが終了したらコールバックを呼び出す
         }
     }
+
+
 
 
 

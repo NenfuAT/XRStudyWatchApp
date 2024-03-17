@@ -14,7 +14,7 @@ class OtherFileStorage(context: Context, filename: String) {
     val extension : String = ".csv"
     val filePath: String = context.applicationContext.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS).toString().plus("/").plus(fileName).plus(extension) //内部ストレージのDocumentのURL
     init {
-        writeText("gets,rssi,address,type")
+        writeText("gets,rssi,address")
     }
     fun writeText(text:String){
         val fil = FileWriter(filePath,fileAppend)

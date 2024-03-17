@@ -545,23 +545,11 @@ fun CountDownCanvas(modifier: Modifier = Modifier, getContent:ActivityResultLaun
                 .clickable {
                     if (state.value == 0) {
                         var CreateCsv = CreateCsv(context)
-                        var count = 0
                         state.value = 1
-                        fun processNext() {
-                            if (count < 30) {
-                                CreateCsv.createcsvdata(count) {
-                                    Log.d("main", "$count")
-                                    count++
-                                    processNext() // 次のループを開始する
-                                    if (count >= 30) { // ループが終了したかどうかを確認
-                                        CreateCsv.GetBle.stopScanning()
-                                        CreateCsv.Savecsv()
-                                        state.value = 2
-                                    }
-                                }
-                            }
+                        CreateCsv.createcsvdata{
+                            CreateCsv.Savecsv()
+                            state.value=2
                         }
-                        processNext()
                     }
 
                 }
