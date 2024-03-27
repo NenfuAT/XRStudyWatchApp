@@ -2,6 +2,7 @@ package com.k21091.xrstudywatchapp.view
 
 import Count1Min
 import android.annotation.SuppressLint
+import android.content.Context
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.Canvas
@@ -54,6 +55,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.k21091.xrstudywatchapp.R
+import com.k21091.xrstudywatchapp.util.CreateCsv
+
 import elapsedMilliseconds
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -464,7 +467,8 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
                 Box(modifier = Modifier.weight(0.05f))
                 CountDownCanvas(modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(1f))
+                    .aspectRatio(1f),
+                    getContent)
                 Box(modifier = Modifier.weight(0.5f))
             }
         }
@@ -495,7 +499,8 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
     }
 }
 @Composable
-fun CountDownCanvas(modifier: Modifier = Modifier) {
+fun CountDownCanvas(modifier: Modifier = Modifier, getContent:ActivityResultLauncher<String>) {
+    val context = LocalContext.current
     val state = remember { mutableStateOf(0) }
     val count1m = remember { Count1Min() }
     val seconds = remember { mutableStateOf(60f) }
@@ -539,16 +544,17 @@ fun CountDownCanvas(modifier: Modifier = Modifier) {
                 .fillMaxSize(0.9f)
                 .clickable {
                     if (state.value == 0) {
+                        var CreateCsv = CreateCsv(context)
                         state.value = 1
-                        count1m.startCountDown { elapsedMilliseconds ->
-                            seconds.value = (60f * 1000 - elapsedMilliseconds) / 1000
-                            if (elapsedMilliseconds >= 60000f) {
-                                state.value = 2
-                            }
+                        CreateCsv.createcsvdata{
+                            CreateCsv.Savecsv()
+                            state.value=2
                         }
                     }
+
                 }
-        ) {
+        )
+        {
             drawArc(
                 color = Color.Black,
                 startAngle = -90f,
