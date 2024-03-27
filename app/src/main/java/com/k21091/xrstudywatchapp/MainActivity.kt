@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -39,7 +40,10 @@ import com.k21091.xrstudywatchapp.ar.samplerender.SampleRender
 import com.k21091.xrstudywatchapp.ar.kotlin.ArRenderer
 import com.k21091.xrstudywatchapp.ar.kotlin.ArView
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
+import com.k21091.xrstudywatchapp.util.imageFileName
+import com.k21091.xrstudywatchapp.util.imageFilePath
 import com.k21091.xrstudywatchapp.view.UiView
+import com.k21091.xrstudywatchapp.view.getPathFromUri
 import com.k21091.xrstudywatchapp.view.selectedImageBitmapState
 import pub.devrel.easypermissions.EasyPermissions
 import java.io.IOException
@@ -72,7 +76,12 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.BLUETOOTH_ADVERTISE,
             Manifest.permission.NEARBY_WIFI_DEVICES,
-            Manifest.permission.BLUETOOTH_CONNECT
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.INTERNET,
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission. WRITE_EXTERNAL_STORAGE,
+            Manifest.permission. READ_EXTERNAL_STORAGE
+
         )
 
         //許可したいpermissionを許可できるように
@@ -81,6 +90,8 @@ class MainActivity : ComponentActivity() {
         }
         // getContent を初期化する
         getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            imageFilePath.value= getPathFromUri(this, uri!!).toString()
+            imageFileName.value= imageFilePath.value.substring(imageFilePath.value.lastIndexOf("/") + 1)
             Log.d("MainActivity", "Selected image bitmap: $selectedImageBitmapState")
             uri?.let { selectedImageBitmapState.value = uriToBitmap(it,this) }
         }

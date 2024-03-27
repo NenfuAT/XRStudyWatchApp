@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,9 +57,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.k21091.xrstudywatchapp.R
 import com.k21091.xrstudywatchapp.util.CreateCsv
+import com.k21091.xrstudywatchapp.util.GetLocation
+import com.k21091.xrstudywatchapp.util.SendHttp
+import com.k21091.xrstudywatchapp.util.csvFileName
+import com.k21091.xrstudywatchapp.util.csvFilePath
+import com.k21091.xrstudywatchapp.util.imageFileName
+import com.k21091.xrstudywatchapp.util.imageFilePath
 
 import elapsedMilliseconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlin.math.roundToInt
 
 class ButtonParts(private val ui: UiView) {
@@ -126,9 +134,24 @@ class ButtonParts(private val ui: UiView) {
     }
 }
 
-class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<String>) {
+class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<String>) {
     var SearchTextField = SearchTextField()
     var uploadpage by mutableStateOf(0)
+
+    val formMap = mutableMapOf<String, String>().apply {
+        put("university", "ホゲ大学")
+        put("undergraduate", "ホゲ学部")
+        put("department","ホゲ学科")
+        put("major","ホゲ専攻")
+        put("laboratory","ホゲ研究室")
+        put("location","ほげ館")
+        put("roomNum","101s")
+        put("latitude","35.681236")
+        put("longitude","-139.767125")
+    }
+
+    val fileList: MutableList<Pair<String, String>> = mutableListOf()
+
     @SuppressLint("NotConstructor")
     @Composable
     fun Menu() {
@@ -136,10 +159,12 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
         val maxOffsetY = 0f
         val minOffsetY = (screenHeight * -0.7f)
         var offsetY by remember { mutableStateOf(0f) }  //コンテンツのOffsetを変更する用
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .offset { IntOffset(0, offsetY.roundToInt()) },
-            contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .offset { IntOffset(0, offsetY.roundToInt()) },
+            contentAlignment = Alignment.Center
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight(0.8f)
@@ -204,10 +229,9 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
                             .fillMaxHeight(0.02f)
                     )
                     if (ui.uploadButtonChecked.value) {
-                        if (uploadpage==0) {
+                        if (uploadpage == 0) {
                             UploadMenu(getContent)
-                        }
-                        else if (uploadpage==1) {
+                        } else if (uploadpage == 1) {
                             UploadMenu(getContent)
                         }
                     }
@@ -275,107 +299,254 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
                 .border(2.dp, Color.Black, RoundedCornerShape(10.dp)),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-        if (uploadpage==0){
+            if (uploadpage == 0) {
+
+                Box(modifier = Modifier.weight(0.1f))
+                Row(modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(0.9f)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        AutoResizeText(
+                            modifier = Modifier
+                                .weight(0.6f),
+                            text = "大学名",
+                            fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
+                            textAlign = TextAlign.Left,
+                            maxLines = 1
+                        )
+                        var University by remember { mutableStateOf("") }
+                        SearchTextField.SearchTextField(
+                            value = University,
+                            onValueChange = {
+                                University = it
+                                formMap["university"] = University
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = Color.Gray.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                        )
+                    }
+
+                }
+
+
+                Box(modifier = Modifier.weight(0.1f))
+                Row(modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(0.9f)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        AutoResizeText(
+                            modifier = Modifier
+                                .weight(0.6f),
+                            text = "学部",
+                            fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
+                            textAlign = TextAlign.Left,
+                            maxLines = 1
+                        )
+                        var Undergraduate by remember { mutableStateOf("") }
+                        SearchTextField.SearchTextField(
+                            value = Undergraduate,
+                            onValueChange = {
+                                Undergraduate = it
+                                formMap["undergraduate"] = Undergraduate
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = Color.Gray.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                        )
+                    }
+                    Box(modifier = Modifier.weight(0.05f))
+                    Column(modifier = Modifier.weight(1f)) {
+                        AutoResizeText(
+                            modifier = Modifier
+                                .weight(0.6f),
+                            text = "学科",
+                            fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
+                            textAlign = TextAlign.Left,
+                            maxLines = 1
+                        )
+                        var Department by remember { mutableStateOf("") }
+                        SearchTextField.SearchTextField(
+                            value = Department,
+                            onValueChange = {
+                                Department = it
+                                formMap["department"] = Department
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = Color.Gray.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                        )
+                    }
+
+
+                }
+                Box(modifier = Modifier.weight(0.1f))
+                Row(modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(0.9f)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        AutoResizeText(
+                            modifier = Modifier
+                                .weight(0.6f),
+                            text = "専攻",
+                            fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
+                            textAlign = TextAlign.Left,
+                            maxLines = 1
+                        )
+                        var Major by remember { mutableStateOf("") }
+                        SearchTextField.SearchTextField(
+                            value = Major,
+                            onValueChange = {
+                                Major = it
+                                formMap["major"] = Major
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = Color.Gray.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                        )
+                    }
+
+                }
+                Box(modifier = Modifier.weight(0.1f))
+                Row(modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(0.9f)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        AutoResizeText(
+                            modifier = Modifier
+                                .weight(0.6f),
+                            text = "研究室名",
+                            fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
+                            textAlign = TextAlign.Left,
+                            maxLines = 1
+                        )
+                        var Laboratory by remember { mutableStateOf("") }
+                        SearchTextField.SearchTextField(
+                            value = Laboratory,
+                            onValueChange = {
+                                Laboratory = it
+                                formMap["laboratory"] = Laboratory
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = Color.Gray.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                        )
+                    }
+
+                }
+                Box(modifier = Modifier.weight(0.1f))
+                Row(modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(0.9f)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        AutoResizeText(
+                            modifier = Modifier
+                                .weight(0.6f),
+                            text = "建物",
+                            fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
+                            textAlign = TextAlign.Left,
+                            maxLines = 1
+                        )
+                        var Location by remember { mutableStateOf("") }
+                        SearchTextField.SearchTextField(
+                            value = Location,
+                            onValueChange = {
+                                Location = it
+                                formMap["location"] = Location
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = Color.Gray.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                        )
+                    }
+                    Box(modifier = Modifier.weight(0.05f))
+                    Column(modifier = Modifier.weight(1f)) {
+                        AutoResizeText(
+                            modifier = Modifier
+                                .weight(0.6f),
+                            text = "部屋番号",
+                            fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
+                            textAlign = TextAlign.Left,
+                            maxLines = 1
+                        )
+                        var RoomNum by remember { mutableStateOf("") }
+                        SearchTextField.SearchTextField(
+                            value = RoomNum,
+                            onValueChange = {
+                                RoomNum = it
+                                formMap["roomNum"] = RoomNum
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = Color.Gray.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                        )
+                    }
+
+
+                }
+                Box(modifier = Modifier.weight(0.1f))
+                Column(modifier = Modifier
+                    .weight(3f)
+                    .fillMaxWidth(0.9f)) {
+                    AutoResizeText(
+                        modifier = Modifier
+                            .weight(0.14f),
+                        text = "研究室紹介資料(.png,.jpgのみ)",
+                        fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
+                        textAlign = TextAlign.Left,
+                        maxLines = 1
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(
+                                color = Color.Gray.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                            .clickable {
+                                getContent.launch("image/*")
+                            }
+                    )
+                    {
+                        ImageSelectionScreen(selectedImageBitmapState.value)
+                    }
+                }
 
                 Box(modifier = Modifier.weight(0.2f))
-                AutoResizeText(
-                    modifier = Modifier
-                        .weight(0.6f)
-                        .fillMaxWidth(0.9f),
-                    text = "大学名",
-                    fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
-                    textAlign = TextAlign.Left,
-                    maxLines = 1
-                )
-                var UniversityName by remember { mutableStateOf("") }
-                SearchTextField.SearchTextField(
-                    value = UniversityName,
-                    onValueChange = { UniversityName = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(0.9f)
-                        .background(
-                            color = Color.Gray.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
-                )
-                Box(modifier = Modifier.weight(0.2f))
-                AutoResizeText(
-                    modifier = Modifier
-                        .weight(0.6f)
-                        .fillMaxWidth(0.9f),
-                    text = "学部学科",
-                    fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
-                    textAlign = TextAlign.Left,
-                    maxLines = 1
-                )
-                var AcademicDepartment by remember { mutableStateOf("") }
-                SearchTextField.SearchTextField(
-                    value = AcademicDepartment,
-                    onValueChange = { AcademicDepartment = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(0.9f)
-                        .background(
-                            color = Color.Gray.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
-                )
-                Box(modifier = Modifier.weight(0.2f))
-                AutoResizeText(
-                    modifier = Modifier
-                        .weight(0.6f)
-                        .fillMaxWidth(0.9f),
-                    text = "研究室名",
-                    fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
-                    textAlign = TextAlign.Left,
-                    maxLines = 1
-                )
-                var LaboratoryName by remember { mutableStateOf("") }
-                SearchTextField.SearchTextField(
-                    value = LaboratoryName,
-                    onValueChange = { LaboratoryName = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(0.9f)
-                        .background(
-                            color = Color.Gray.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
-                )
-                Box(modifier = Modifier.weight(0.2f))
-                AutoResizeText(
-                    modifier = Modifier
-                        .weight(0.6f)
-                        .fillMaxWidth(0.9f),
-                    text = "研究室紹介資料(.png,.jpgのみ)",
-                    fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp),
-                    textAlign = TextAlign.Left,
-                    maxLines = 1
-                )
                 Box(
                     modifier = Modifier
-                        .weight(5f)
-                        .fillMaxWidth(0.9f)
-                        .background(
-                            color = Color.Gray.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
-                        .clickable {
-                            getContent.launch("image/*")
-                        }
-                )
-                {
-                    ImageSelectionScreen(selectedImageBitmapState.value)
-                }
-                Box(modifier = Modifier.weight(0.2f))
-                Box(
-                    modifier = Modifier
-                        .weight(1.5f)
+                        .weight(1.2f)
                         .fillMaxWidth(0.9f)
                         .background(
                             color = Color.White.copy(alpha = 0.4f),
@@ -401,77 +572,97 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
                 }
                 Box(modifier = Modifier.weight(0.2f))
 
-            }
-        else if(uploadpage==1){
-            Box(modifier = Modifier.weight(0.1f))
-            Box(modifier = Modifier
-                .weight(0.5f)
-                .fillMaxWidth(0.9f),
-                contentAlignment = Alignment.Center
-            ){
-                AutoResizeText(
-                    modifier = Modifier
-                        .fillMaxHeight(0.9f)
-                        .fillMaxWidth(),
-                    text = "1分間表示させたいエリア\nを歩いてください",
-                    fontSizeRange = FontSizeRange(min = 10.sp, max = 50.sp),
-                    textAlign = TextAlign.Center,
-                    maxLines = 2
-                )
-            }
-            Box(modifier = Modifier
-                .weight(0.7f)
-                .fillMaxWidth(0.9f),
-                contentAlignment = Alignment.Center
-            ){
+            } else if (uploadpage == 1) {
+                Box(modifier = Modifier.weight(0.1f))
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight(1f)
-                        .aspectRatio(1f),
+                        .weight(0.5f)
+                        .fillMaxWidth(0.9f),
                     contentAlignment = Alignment.Center
-                ){
-                    Canvas(
+                ) {
+                    AutoResizeText(
                         modifier = Modifier
-                            .fillMaxSize(),
-                        onDraw = {
-                            drawArc(
-                                color = Color.Black,
-                                startAngle = -40f, // 調整
-                                sweepAngle = 260f, // 調整
-                                useCenter = false,
-                                topLeft= Offset(0F,(size.height / 3)*2),
-                                size = Size(size.width, size.height/3),
-                                style = Stroke(
-                                    width = size.height*0.04f,
-                                    cap = StrokeCap.Round, // 角を丸くする
-                                ),
-                            )
-                        }
+                            .fillMaxHeight(0.9f)
+                            .fillMaxWidth(),
+                        text = "1分間表示させたいエリア\nを歩いてください",
+                        fontSizeRange = FontSizeRange(min = 10.sp, max = 50.sp),
+                        textAlign = TextAlign.Center,
+                        maxLines = 2
                     )
-                    Icon(
-                        modifier=Modifier.fillMaxSize(0.9f),
-                        painter = painterResource(R.drawable.walk), contentDescription = "歩く",
-                        tint = Color.Black
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(0.7f)
+                        .fillMaxWidth(0.9f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight(1f)
+                            .aspectRatio(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize(),
+                            onDraw = {
+                                drawArc(
+                                    color = Color.Black,
+                                    startAngle = -40f, // 調整
+                                    sweepAngle = 260f, // 調整
+                                    useCenter = false,
+                                    topLeft = Offset(0F, (size.height / 3) * 2),
+                                    size = Size(size.width, size.height / 3),
+                                    style = Stroke(
+                                        width = size.height * 0.04f,
+                                        cap = StrokeCap.Round, // 角を丸くする
+                                    ),
+                                )
+                            }
+                        )
+                        Icon(
+                            modifier = Modifier.fillMaxSize(0.9f),
+                            painter = painterResource(R.drawable.walk), contentDescription = "歩く",
+                            tint = Color.Black
+                        )
+                    }
+
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1.5f)
+                        .fillMaxWidth(0.9f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                )
+
+
+                {
+                    Box(modifier = Modifier.weight(0.05f))
+                    CountDownCanvas(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f),
+                        getContent,
+                        formMap,
+                        fileList,
+                        ui
                     )
+                    Box(modifier = Modifier.weight(0.5f))
+                    {
+
+                        AutoResizeText(
+                            modifier = Modifier
+                                .fillMaxHeight(0.9f)
+                                .fillMaxWidth(),
+                            text = "アップロード完了",
+                            fontSizeRange = FontSizeRange(min = 10.sp, max = 50.sp),
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
+                        )
+                    }
                 }
 
             }
-            Column(modifier = Modifier
-                .weight(1.5f)
-                .fillMaxWidth(0.9f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            )
-
-
-            {
-                Box(modifier = Modifier.weight(0.05f))
-                CountDownCanvas(modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(1f),
-                    getContent)
-                Box(modifier = Modifier.weight(0.5f))
-            }
-        }
         }
 
 
@@ -498,14 +689,16 @@ class MenuParts(private val ui: UiView,var getContent:ActivityResultLauncher<Str
         }
     }
 }
+
 @Composable
-fun CountDownCanvas(modifier: Modifier = Modifier, getContent:ActivityResultLauncher<String>) {
+fun CountDownCanvas(modifier: Modifier = Modifier, getContent: ActivityResultLauncher<String>,formMap:  MutableMap<String, String>,
+                    fileList: MutableList<Pair<String, String>>,      ui: UiView) {
     val context = LocalContext.current
     val state = remember { mutableStateOf(0) }
     val count1m = remember { Count1Min() }
     val seconds = remember { mutableStateOf(60f) }
     Box(modifier = modifier, Alignment.Center) {
-        if (state.value==0){
+        if (state.value == 0) {
             AutoResizeText(
                 modifier = Modifier
                     .fillMaxHeight(0.5f)
@@ -516,7 +709,7 @@ fun CountDownCanvas(modifier: Modifier = Modifier, getContent:ActivityResultLaun
                 maxLines = 1
             )
         }
-        if (state.value==1){
+        if (state.value == 1) {
             AutoResizeText(
                 modifier = Modifier
                     .fillMaxHeight(0.5f)
@@ -527,7 +720,7 @@ fun CountDownCanvas(modifier: Modifier = Modifier, getContent:ActivityResultLaun
                 maxLines = 1
             )
         }
-        if (state.value==2){
+        if (state.value == 2) {
             AutoResizeText(
                 modifier = Modifier
                     .fillMaxHeight(0.4f)
@@ -544,11 +737,37 @@ fun CountDownCanvas(modifier: Modifier = Modifier, getContent:ActivityResultLaun
                 .fillMaxSize(0.9f)
                 .clickable {
                     if (state.value == 0) {
-                        var CreateCsv = CreateCsv(context)
+                        count1m.startCountDown {
+                            seconds.value = 60 - (it / 1000)
+                            if (seconds.value <= 0) {
+                                state.value = 2
+                            }
+                        }
+                        var CreateCsv = CreateCsv(context,5)
                         state.value = 1
-                        CreateCsv.createcsvdata{
-                            CreateCsv.Savecsv()
-                            state.value=2
+                        CreateCsv.createcsvdata {
+                            if (ui.uploadButtonChecked.value){
+                                var GetLocation=GetLocation(context)
+                                var locations=GetLocation.getLatitudeAndLongitudeAsString()
+                                //formMap["latitude"]= locations?.get("latitude") ?: ""
+                                //formMap["longitude"]=locations?.get("longitude") ?: ""
+                                fileList.add(Pair("rawDataFile", csvFilePath.value))
+                                fileList.add(Pair("objectFile", imageFilePath.value))
+                                var SendHttp = SendHttp()
+                                //Log.d("map", formMap.toString())
+                                //Log.d("filelist", fileList.toString())
+                                var body=SendHttp.buildMultipartFormDataBody(formMap,fileList)
+                                Log.d("body", SendHttp.requestBodyToString(body))
+                                runBlocking {
+                                    try {
+                                        // 非同期関数を呼び出し、結果を取得
+                                        val res = SendHttp.sendRequest(body)
+                                    } catch (e: Exception) {
+                                        // エラーが発生した場合の処理
+                                        println("Error: ${e.message}")
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -558,7 +777,7 @@ fun CountDownCanvas(modifier: Modifier = Modifier, getContent:ActivityResultLaun
             drawArc(
                 color = Color.Black,
                 startAngle = -90f,
-                sweepAngle = -360f ,
+                sweepAngle = -360f,
                 useCenter = false,
                 style = Stroke(width = size.height * 0.01f, cap = StrokeCap.Round),
                 size = Size(size.width, size.height)

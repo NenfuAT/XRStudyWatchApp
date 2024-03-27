@@ -1,3 +1,4 @@
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -15,7 +16,8 @@ class GetBLE{
     private var results = mutableListOf<String>()
     private var scanCallback: ScanCallback? = null
 
-    fun startScan(count:Int,callback: (List<String>) -> Unit) {
+    @SuppressLint("MissingPermission")
+    fun startScan(count:Int, callback: (List<String>) -> Unit) {
         bluetoothLeScanner?.let { scanner ->
             if (scanCallback == null) {
                 results.clear() // スキャンが開始される前に結果をクリア
@@ -26,7 +28,7 @@ class GetBLE{
                         val receiveRssi = result.rssi
                         uuids?.forEach { uuid ->
                             val uuidString = uuid.uuid.toString()
-                            results.add("$count,$uuidString,$receiveRssi")
+                            results.add("$count,$receiveRssi,$uuidString")
                         }
                     }
 
@@ -47,7 +49,8 @@ class GetBLE{
         }
     }
 
-    private fun stopScan() {
+    @SuppressLint("MissingPermission")
+    fun stopScan() {
         scanCallback?.let { bluetoothLeScanner?.stopScan(it) }
         scanCallback = null
         Log.d("GetBLE", "Batch scan stopped")

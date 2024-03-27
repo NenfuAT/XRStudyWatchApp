@@ -1,5 +1,7 @@
 package com.k21091.xrstudywatchapp.view
 
+import Count1Min
+import android.content.Context
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
@@ -17,15 +19,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.k21091.xrstudywatchapp.MainActivity
+import com.k21091.xrstudywatchapp.util.CreateCsv
+import com.k21091.xrstudywatchapp.util.cancelScan
+import com.k21091.xrstudywatchapp.util.stop
+import stopCountDown
 
 
 class UiView (getContent: ActivityResultLauncher<String>){
     private val Buttons = ButtonParts(this)
     private val Menus =MenuParts(this,getContent)
     val uploadButtonChecked = mutableStateOf(false)
-
     val nearObjectButtonChecked = mutableStateOf(false)
 
     fun onUploadButtonClicked() {
@@ -34,8 +40,28 @@ class UiView (getContent: ActivityResultLauncher<String>){
             nearObjectButtonChecked.value = false
         }
         uploadButtonChecked.value = !uploadButtonChecked.value
-        selectedImageBitmapState.value=null
-        Menus.uploadpage=0
+        if (uploadButtonChecked.value){
+            stop=false
+        }
+        if(!uploadButtonChecked.value){
+            selectedImageBitmapState.value=null
+            Menus.uploadpage=0
+            Menus.formMap.clear()
+            Menus.formMap.apply {
+                put("university", "")
+                put("undergraduate", "")
+                put("department", "")
+                put("major", "")
+                put("laboratory", "")
+                put("location", "")
+                put("roomNum", "")
+                put("latitude", "")
+                put("longitude", "")
+            }
+            stopCountDown()
+            cancelScan()
+        }
+
         Log.d("up", uploadButtonChecked.value.toString())
     }
 
@@ -43,6 +69,22 @@ class UiView (getContent: ActivityResultLauncher<String>){
         // もしアップロードボタンが true なら、false に設定する
         if (uploadButtonChecked.value) {
             uploadButtonChecked.value = false
+            selectedImageBitmapState.value=null
+            Menus.uploadpage=0
+            Menus.formMap.clear()
+            Menus.formMap.apply {
+                put("university", "")
+                put("undergraduate", "")
+                put("department", "")
+                put("major", "")
+                put("laboratory", "")
+                put("location", "")
+                put("roomNum", "")
+                put("latitude", "")
+                put("longitude", "")
+            }
+            stopCountDown()
+            cancelScan()
         }
         nearObjectButtonChecked.value = !nearObjectButtonChecked.value
         Log.d("near", nearObjectButtonChecked.value.toString())

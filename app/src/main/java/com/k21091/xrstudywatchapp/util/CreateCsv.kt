@@ -3,38 +3,47 @@ package com.k21091.xrstudywatchapp.util
 import GetBLE
 import GetWiFi
 import android.content.Context
+import kotlinx.coroutines.*
 
-class CreateCsv(context: Context)  {
-    var GetBle= GetBLE()
-    var GetWiFi=GetWiFi(context)
-    var OtherFileStorage=OtherFileStorage(context,"${System.currentTimeMillis()}")
-    var BleData=mutableListOf<String>()
-    var WifiData=mutableListOf<String>()
-    var count=0
+var BleData = mutableListOf<String>()
+var WifiData = mutableListOf<String>()
+var stop: Boolean = false
+class CreateCsv(context: Context,getCount: Int) {
+    var getCount=getCount
+    var GetBle = GetBLE()
+    var GetWiFi = GetWiFi(context)
+    var OtherFileStorage = OtherFileStorage(context, "${System.currentTimeMillis()}")
+
+    var count = 0
+
     fun createcsvdata(completion: () -> Unit) {
-        if (count < 5) {
+        if (count < getCount) {
             GetBle.startScan(count){bleResults->
+                if (stop){
+                    count=getCount
+                    completion()
+
+                }
                 BleData.addAll(bleResults)
                 val wifiResults = GetWiFi.getResults()
                 for (result in wifiResults) {
                     val bssid = result.BSSID
                     val level = result.level
-                    WifiData.add("$count,$bssid,$level")
+                    WifiData.add("$count,$level,$bssid")
                 }
                 count++
                 createcsvdata(completion) // 再帰的に次のスキャンを実行
             }
         } else {
+            Savecsv()
             completion() // 5回のスキャンが終了したらコールバックを呼び出す
         }
     }
 
 
 
-
-
-    fun Savecsv(){
-        val Fpdata= mutableListOf<String>()
+    fun Savecsv() {
+        val Fpdata = mutableListOf<String>()
         for (result in BleData) {
             Fpdata.add(result)
         }
@@ -48,4 +57,9 @@ class CreateCsv(context: Context)  {
         BleData.clear()
         WifiData.clear()
     }
+}
+fun cancelScan() {
+    stop=true
+    BleData.clear()
+    WifiData.clear()
 }
