@@ -7,3 +7,6 @@ var imageFilePath = mutableStateOf<String>("")
 var imageFileName = mutableStateOf<String>("")
 var csvFilePath = mutableStateOf<String>("")
 var csvFileName = mutableStateOf<String>("")
+
+var scanCsvPath= mutableStateOf<String>("")
+var scanCsvName= mutableStateOf<String>("")

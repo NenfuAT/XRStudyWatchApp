@@ -2,7 +2,6 @@ package com.k21091.xrstudywatchapp.view
 
 import Count1Min
 import android.annotation.SuppressLint
-import android.content.Context
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.Canvas
@@ -22,21 +21,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -58,16 +52,233 @@ import androidx.compose.ui.unit.sp
 import com.k21091.xrstudywatchapp.R
 import com.k21091.xrstudywatchapp.util.CreateCsv
 import com.k21091.xrstudywatchapp.util.GetLocation
-import com.k21091.xrstudywatchapp.util.SendHttp
-import com.k21091.xrstudywatchapp.util.csvFileName
+import com.k21091.xrstudywatchapp.util.buildJsonDataBody
+import com.k21091.xrstudywatchapp.util.buildMultipartFormDataBody
 import com.k21091.xrstudywatchapp.util.csvFilePath
-import com.k21091.xrstudywatchapp.util.imageFileName
 import com.k21091.xrstudywatchapp.util.imageFilePath
+import com.k21091.xrstudywatchapp.util.requestBodyToString
+import com.k21091.xrstudywatchapp.util.sendRequest
+import org.json.JSONException
+import org.json.JSONObject
 
-import elapsedMilliseconds
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import kotlin.math.roundToInt
+
+
+@Composable
+fun LoginHome(
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight(0.7f)
+            .fillMaxWidth(0.9f),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(modifier = Modifier.weight(1f))
+        AutoResizeText(
+            modifier = Modifier.weight(2f),
+            text = "研究活動\nWatch",
+            fontSizeRange = FontSizeRange(min = 30.sp, max = 50.sp),
+            textAlign = TextAlign.Center
+        )
+        Box(modifier = Modifier.weight(2f))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.7f)
+                .background(
+                    Color.LightGray,
+                    shape = RoundedCornerShape(30.dp)
+                )
+                .clickable { loginButtonChecked.value = true }
+        ) {
+            AutoResizeText(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.6f),
+                text = "ログイン",
+                fontSizeRange = FontSizeRange(min = 20.sp, max = 30.sp),
+                textAlign = TextAlign.Center
+            )
+        }
+        Box(modifier = Modifier.weight(0.1f))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.7f)
+                .background(
+                    Color.LightGray,
+                    shape = RoundedCornerShape(30.dp)
+                )
+                .clickable { createUserButtonChecked.value = true }
+        ) {
+            AutoResizeText(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.6f),
+                text = "ユーザ登録",
+                fontSizeRange = FontSizeRange(min = 20.sp, max = 30.sp),
+                textAlign = TextAlign.Center
+            )
+        }
+        Box(modifier = Modifier.weight(0.1f))
+        Box(
+            modifier = Modifier
+                .weight(0.5f)
+                .fillMaxWidth(0.7f)
+        ) {
+            AutoResizeText(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(),
+                text = "アプリケーションについて",
+                fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun LoginMenu(
+    toMain: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val formMap by remember { mutableStateOf(mutableMapOf("email" to "", "password" to "")) }
+
+
+    Column(
+        modifier = modifier
+            .fillMaxHeight(0.5f)
+            .fillMaxWidth(0.9f)
+            .background(
+                color = Color.LightGray,
+                shape = RoundedCornerShape(15.dp)
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    )
+    {
+        Box(modifier = Modifier
+            .weight(0.6f)
+            .fillMaxWidth()) {
+            IconButton(
+                modifier = Modifier.align(Alignment.TopEnd),
+                onClick = { loginButtonChecked.value = false }
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Back",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.9f)
+        )
+        {
+
+            Box(modifier = Modifier.weight(0.2f))
+            var Email by remember { mutableStateOf("") }
+            AutoResizeText(
+                modifier = Modifier.weight(0.5f),
+                text = "メールアドレス",
+                fontSizeRange = FontSizeRange(min = 20.sp, max = 50.sp),
+            )
+            SearchTextField(
+                value = Email,
+                onValueChange = {
+                    Email = it
+                    formMap["email"] = it
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        color = Color.Gray.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+            )
+            Box(modifier = Modifier.weight(0.2f))
+            AutoResizeText(
+                modifier = Modifier.weight(0.5f),
+                text = "パスワード",
+                fontSizeRange = FontSizeRange(min = 20.sp, max = 50.sp),
+            )
+            var Password by remember { mutableStateOf("") }
+            SearchTextField(
+                value = Password,
+                onValueChange = {
+                    Password = it
+                    formMap["password"] = it
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        color = Color.Gray.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+            )
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.9f)
+        ) {
+            Box(modifier = Modifier
+                .fillMaxHeight(0.5f)
+                .fillMaxWidth()
+                .background(Color.Gray, shape = RoundedCornerShape(10.dp))
+                .align(Alignment.Center)
+                .clickable {
+                    Log.d("form", "$formMap")
+                    var body=buildJsonDataBody(formMap)
+
+                    Log.d("body", requestBodyToString(body))
+                    sendRequest(body,"api/user/login",
+                        onResponse = { response ->
+                            // レスポンスが正常に受信された場合の処理
+                            // ここで必要な処理を行います
+
+                            try {
+                                val jsonResponse = JSONObject(response.toString())
+                                val error = jsonResponse.optString("error")
+                                if (error.isNotEmpty()) {
+                                    println("Error received: $error")
+                                } else {
+                                    val id = jsonResponse.optString("id")
+                                    println("Response received: $id")
+                                }
+                            } catch (e: JSONException) {
+                                e.printStackTrace()
+                                // JSONのパースエラーが発生した場合の処理
+                            }
+
+                        },
+                        onFailure = { errorMessage ->
+                            // エラーが発生した場合の処理
+                            println("Request failed with exception: $errorMessage")
+                            // ここでエラー処理を行います
+                        }
+                    )
+                }
+            )
+            {
+                AutoResizeText(
+                    modifier = Modifier
+                        .fillMaxSize(0.6f)
+                        .align(Alignment.Center),
+                    text = "ログイン",
+                    fontSizeRange = FontSizeRange(min = 30.sp, max = 60.sp),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
 
 class ButtonParts(private val ui: UiView) {
     val iconModifier = Modifier
@@ -135,19 +346,18 @@ class ButtonParts(private val ui: UiView) {
 }
 
 class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<String>) {
-    var SearchTextField = SearchTextField()
     var uploadpage by mutableStateOf(0)
 
     val formMap = mutableMapOf<String, String>().apply {
         put("university", "ホゲ大学")
         put("undergraduate", "ホゲ学部")
-        put("department","ホゲ学科")
-        put("major","ホゲ専攻")
-        put("laboratory","ホゲ研究室")
-        put("location","ほげ館")
-        put("roomNum","101s")
-        put("latitude","35.681236")
-        put("longitude","-139.767125")
+        put("department", "ホゲ学科")
+        put("major", "ホゲ専攻")
+        put("laboratory", "ホゲ研究室")
+        put("location", "ほげ館")
+        put("roomNum", "101s")
+        put("latitude", "35.681236")
+        put("longitude", "-139.767125")
     }
 
     val fileList: MutableList<Pair<String, String>> = mutableListOf()
@@ -302,9 +512,11 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
             if (uploadpage == 0) {
 
                 Box(modifier = Modifier.weight(0.1f))
-                Row(modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(0.9f)) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(0.9f)
+                ) {
                     Column(modifier = Modifier.weight(1f)) {
                         AutoResizeText(
                             modifier = Modifier
@@ -315,7 +527,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             maxLines = 1
                         )
                         var University by remember { mutableStateOf("") }
-                        SearchTextField.SearchTextField(
+                        SearchTextField(
                             value = University,
                             onValueChange = {
                                 University = it
@@ -335,9 +547,11 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
 
 
                 Box(modifier = Modifier.weight(0.1f))
-                Row(modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(0.9f)) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(0.9f)
+                ) {
                     Column(modifier = Modifier.weight(1f)) {
                         AutoResizeText(
                             modifier = Modifier
@@ -348,7 +562,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             maxLines = 1
                         )
                         var Undergraduate by remember { mutableStateOf("") }
-                        SearchTextField.SearchTextField(
+                        SearchTextField(
                             value = Undergraduate,
                             onValueChange = {
                                 Undergraduate = it
@@ -374,7 +588,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             maxLines = 1
                         )
                         var Department by remember { mutableStateOf("") }
-                        SearchTextField.SearchTextField(
+                        SearchTextField(
                             value = Department,
                             onValueChange = {
                                 Department = it
@@ -393,9 +607,11 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
 
                 }
                 Box(modifier = Modifier.weight(0.1f))
-                Row(modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(0.9f)) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(0.9f)
+                ) {
                     Column(modifier = Modifier.weight(1f)) {
                         AutoResizeText(
                             modifier = Modifier
@@ -406,7 +622,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             maxLines = 1
                         )
                         var Major by remember { mutableStateOf("") }
-                        SearchTextField.SearchTextField(
+                        SearchTextField(
                             value = Major,
                             onValueChange = {
                                 Major = it
@@ -424,9 +640,11 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
 
                 }
                 Box(modifier = Modifier.weight(0.1f))
-                Row(modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(0.9f)) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(0.9f)
+                ) {
                     Column(modifier = Modifier.weight(1f)) {
                         AutoResizeText(
                             modifier = Modifier
@@ -437,7 +655,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             maxLines = 1
                         )
                         var Laboratory by remember { mutableStateOf("") }
-                        SearchTextField.SearchTextField(
+                        SearchTextField(
                             value = Laboratory,
                             onValueChange = {
                                 Laboratory = it
@@ -455,9 +673,11 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
 
                 }
                 Box(modifier = Modifier.weight(0.1f))
-                Row(modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(0.9f)) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(0.9f)
+                ) {
                     Column(modifier = Modifier.weight(1f)) {
                         AutoResizeText(
                             modifier = Modifier
@@ -468,7 +688,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             maxLines = 1
                         )
                         var Location by remember { mutableStateOf("") }
-                        SearchTextField.SearchTextField(
+                        SearchTextField(
                             value = Location,
                             onValueChange = {
                                 Location = it
@@ -494,7 +714,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             maxLines = 1
                         )
                         var RoomNum by remember { mutableStateOf("") }
-                        SearchTextField.SearchTextField(
+                        SearchTextField(
                             value = RoomNum,
                             onValueChange = {
                                 RoomNum = it
@@ -513,9 +733,11 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
 
                 }
                 Box(modifier = Modifier.weight(0.1f))
-                Column(modifier = Modifier
-                    .weight(3f)
-                    .fillMaxWidth(0.9f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(3f)
+                        .fillMaxWidth(0.9f)
+                ) {
                     AutoResizeText(
                         modifier = Modifier
                             .weight(0.14f),
@@ -691,8 +913,13 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
 }
 
 @Composable
-fun CountDownCanvas(modifier: Modifier = Modifier, getContent: ActivityResultLauncher<String>,formMap:  MutableMap<String, String>,
-                    fileList: MutableList<Pair<String, String>>,      ui: UiView) {
+fun CountDownCanvas(
+    modifier: Modifier = Modifier,
+    getContent: ActivityResultLauncher<String>,
+    formMap: MutableMap<String, String>,
+    fileList: MutableList<Pair<String, String>>,
+    ui: UiView
+) {
     val context = LocalContext.current
     val state = remember { mutableStateOf(0) }
     val count1m = remember { Count1Min() }
@@ -743,29 +970,28 @@ fun CountDownCanvas(modifier: Modifier = Modifier, getContent: ActivityResultLau
                                 state.value = 2
                             }
                         }
-                        var CreateCsv = CreateCsv(context,5)
+                        var CreateCsv = CreateCsv(context, 5)
                         state.value = 1
                         CreateCsv.createcsvdata {
-                            if (ui.uploadButtonChecked.value){
-                                var GetLocation=GetLocation(context)
-                                var locations=GetLocation.getLatitudeAndLongitudeAsString()
-                                //formMap["latitude"]= locations?.get("latitude") ?: ""
-                                //formMap["longitude"]=locations?.get("longitude") ?: ""
+                            if (ui.uploadButtonChecked.value) {
+                                var GetLocation = GetLocation(context)
+                                var locations = GetLocation.getLatitudeAndLongitudeAsString()
+                                formMap["latitude"]= locations?.get("latitude") ?: ""
+                                formMap["longitude"]=locations?.get("longitude") ?: ""
                                 fileList.add(Pair("rawDataFile", csvFilePath.value))
                                 fileList.add(Pair("objectFile", imageFilePath.value))
-                                var SendHttp = SendHttp()
-                                //Log.d("map", formMap.toString())
-                                //Log.d("filelist", fileList.toString())
-                                var body=SendHttp.buildMultipartFormDataBody(formMap,fileList)
-                                Log.d("body", SendHttp.requestBodyToString(body))
-                                runBlocking {
-                                    try {
-                                        // 非同期関数を呼び出し、結果を取得
-                                        val res = SendHttp.sendRequest(body)
-                                    } catch (e: Exception) {
-                                        // エラーが発生した場合の処理
-                                        println("Error: ${e.message}")
+                                var body = buildMultipartFormDataBody(formMap, fileList)
+                                Log.d("body", requestBodyToString(body))
+                                sendRequest(body,"api/object/create",
+                                    onResponse = { response ->
+                                        // レスポンスが正常に受信された場合の処理
+                                        println("Response received: $response")
+                                        // ここで必要な処理を行います
                                     }
+                                ) { errorMessage ->
+                                    // エラーが発生した場合の処理
+                                    println("Request failed with exception: $errorMessage")
+                                    // ここでエラー処理を行います
                                 }
                             }
                         }

@@ -1,6 +1,7 @@
 package com.k21091.xrstudywatchapp
 
 import android.Manifest
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -13,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +26,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
@@ -39,9 +44,11 @@ import com.k21091.xrstudywatchapp.ar.helpers.InstantPlacementSettings
 import com.k21091.xrstudywatchapp.ar.samplerender.SampleRender
 import com.k21091.xrstudywatchapp.ar.kotlin.ArRenderer
 import com.k21091.xrstudywatchapp.ar.kotlin.ArView
+import com.k21091.xrstudywatchapp.service.SpotScanService
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
 import com.k21091.xrstudywatchapp.util.imageFileName
 import com.k21091.xrstudywatchapp.util.imageFilePath
+import com.k21091.xrstudywatchapp.view.LoginView
 import com.k21091.xrstudywatchapp.view.UiView
 import com.k21091.xrstudywatchapp.view.getPathFromUri
 import com.k21091.xrstudywatchapp.view.selectedImageBitmapState
@@ -96,6 +103,7 @@ class MainActivity : ComponentActivity() {
             uri?.let { selectedImageBitmapState.value = uriToBitmap(it,this) }
         }
 
+
         // Setup ARCore session lifecycle helper and configuration.
         arCoreSessionHelper = ARCoreSessionLifecycleHelper(this)
         // If Session creation or Session.resume() fails, display a message and log detailed
@@ -140,7 +148,7 @@ class MainActivity : ComponentActivity() {
 
         // setContent の後に配置する
         setContent {
-            MainView()
+            Root()
         }
     }
 
@@ -204,6 +212,34 @@ class MainActivity : ComponentActivity() {
             null
         }
     }
+
+
+    enum class Screens {
+        LOGIN,
+        MAIN,
+    }
+    @Composable
+    fun Root(modifier: Modifier = Modifier) {
+        // Create NavController
+        val navController = rememberNavController()
+        // Create NavHost
+        NavHost(
+            navController = navController,
+            startDestination =Screens.LOGIN.name
+        ) {
+            composable(Screens.LOGIN.name) {
+                LoginView(
+                    toMain= {navController.navigate(Screens.MAIN.name)},
+                    modifier = modifier
+                )
+            }
+
+            composable(Screens.MAIN.name) {
+                MainView()
+            }
+
+        }
+    }
     @Composable
     fun OpenGLView() {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -213,9 +249,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+
+
     @Composable
     fun MainView() = XRStudyWatchAppTheme {
-        val ui=UiView(getContent)
+        val ui=UiView(this,getContent)
         //OpenGLView()
         ui.Buttonlayout()
         ui.Menulayout()

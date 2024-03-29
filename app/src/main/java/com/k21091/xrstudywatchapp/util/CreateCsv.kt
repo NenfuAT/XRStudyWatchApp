@@ -36,7 +36,9 @@ class CreateCsv(context: Context,getCount: Int) {
             }
         } else {
             Savecsv()
-            completion() // 5回のスキャンが終了したらコールバックを呼び出す
+            completion()
+            count=0
+        // 5回のスキャンが終了したらコールバックを呼び出す
         }
     }
 

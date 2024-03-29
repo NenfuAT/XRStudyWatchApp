@@ -1,73 +1,78 @@
 package com.k21091.xrstudywatchapp.util
 
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okio.Buffer
 import okio.IOException
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-class SendHttp {
-    fun buildMultipartFormDataBody(formData: Map<String, String>, fileParams: List<Pair<String, String>>): RequestBody {
-        val requestBodyBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
+fun buildMultipartFormDataBody(
+    formData: Map<String, String>,
+    fileParams: List<Pair<String, String>>
+): RequestBody {
+    val requestBodyBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
 
-        // フォームデータを追加
-        formData.forEach { (key, value) ->
-            requestBodyBuilder.addFormDataPart(key, value)
-        }
-
-        // ファイルを追加
-        fileParams.forEachIndexed { _, (fileKey, filePath) ->
-            val file = File(filePath)
-            requestBodyBuilder.addFormDataPart(
-                fileKey,
-                file.name,
-                file.asRequestBody("application/octet-stream".toMediaTypeOrNull())
-            )
-        }
-
-        return requestBodyBuilder.build()
+    // フォームデータを追加
+    formData.forEach { (key, value) ->
+        requestBodyBuilder.addFormDataPart(key, value)
     }
 
-    suspend fun sendRequest(body: RequestBody) {
-        return withContext(Dispatchers.IO) {
-            val client = OkHttpClient.Builder()
-                .readTimeout(30, TimeUnit.SECONDS) // 読み取りタイムアウト時間を30秒に設定
-                .writeTimeout(30, TimeUnit.SECONDS) // 書き込みタイムアウト時間を30秒に設定
-                .connectTimeout(30, TimeUnit.SECONDS) // 接続タイムアウト時間を30秒に設定
-                .build() // OkHttpClientを構築
+    // ファイルを追加
+    fileParams.forEachIndexed { _, (fileKey, filePath) ->
+        val file = File(filePath)
+        requestBodyBuilder.addFormDataPart(
+            fileKey,
+            file.name,
+            file.asRequestBody("application/octet-stream".toMediaTypeOrNull())
+        )
+    }
 
-            val request = Request.Builder()
-                //.url("http://10.0.2.2:8084/api/object/create")
-                .url("http://192.168.11.21:8084/api/object/create")
-                .post(body)
-                .build()
+    return requestBodyBuilder.build()
+}
 
-            // enqueue()メソッドを使用して非同期リクエストを実行し、レスポンスを受け取る
-            client.newCall(request).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    // リクエストの失敗時の処理
-                    e.printStackTrace()
-                }
+fun buildJsonDataBody(formData: Map<String, String>): RequestBody {
+    val jsonString = Json.encodeToString(formData)
+    return jsonString.toRequestBody("application/json".toMediaType())
+}
 
-                override fun onResponse(call: Call, response: Response) {
-                    val responseBodyString = response.body?.string()
-                    Log.d("res","$responseBodyString")
-                }
-            })
+fun sendRequest(body: RequestBody,api:String, onResponse: (String?) -> Unit, onFailure: (String) -> Unit) {
+    CoroutineScope(Dispatchers.IO).launch {
+        val client = OkHttpClient.Builder()
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .build()
+
+        val request = Request.Builder()
+            .url("http://10.0.2.2:8084/$api")
+            .post(body)
+            .build()
+
+        try {
+            val response = client.newCall(request).execute()
+            val responseBodyString = response.body?.string()
+            // レスポンスをコールバックに渡す
+            onResponse(responseBodyString)
+        } catch (e: IOException) {
+            // エラーが発生した場合、エラーメッセージをコールバックに渡す
+            onFailure(e.message ?: "Unknown error")
         }
     }
+}
 
-
-    fun requestBodyToString(requestBody: RequestBody): String {
-        val buffer = Buffer()
-        requestBody.writeTo(buffer)
-        return buffer.readUtf8()
-    }
-
-
+fun requestBodyToString(requestBody: RequestBody): String {
+    val buffer = Buffer()
+    requestBody.writeTo(buffer)
+    return buffer.readUtf8()
 }
