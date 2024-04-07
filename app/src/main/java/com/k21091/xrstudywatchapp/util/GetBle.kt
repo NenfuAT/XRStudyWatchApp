@@ -12,6 +12,8 @@ class GetBLE{
     private val bluetoothLeScanner: BluetoothLeScanner? = bluetoothAdapter?.bluetoothLeScanner
     private val handler = Handler()
 
+    var blestop = false
+
     private val SCAN_PERIOD: Long = 5000
     private var results = mutableListOf<String>()
     private var scanCallback: ScanCallback? = null
@@ -19,17 +21,21 @@ class GetBLE{
     @SuppressLint("MissingPermission")
     fun startScan(count:Int, callback: (List<String>) -> Unit) {
         bluetoothLeScanner?.let { scanner ->
+            if (blestop){
+                bluetoothLeScanner.stopScan(scanCallback) // 修正
+                return
+            }
             if (scanCallback == null) {
                 results.clear() // スキャンが開始される前に結果をクリア
                 scanCallback = object : ScanCallback() {
                     override fun onScanResult(callbackType: Int, result: ScanResult) {
                         super.onScanResult(callbackType, result)
-                        val uuids = result.scanRecord?.serviceUuids
+                        val device = result.device
+                        val macAddress = device.address // MAC アドレスを取得
+
                         val receiveRssi = result.rssi
-                        uuids?.forEach { uuid ->
-                            val uuidString = uuid.uuid.toString()
-                            results.add("$count,$receiveRssi,$uuidString")
-                        }
+
+                        results.add("$count,$receiveRssi,$macAddress,ble")
                     }
 
                     override fun onScanFailed(errorCode: Int) {
@@ -55,5 +61,10 @@ class GetBLE{
         scanCallback = null
         Log.d("GetBLE", "Batch scan stopped")
     }
-}
 
+    fun BLEfin(){
+        blestop=true
+    }
+
+
+}

@@ -3,44 +3,53 @@ package com.k21091.xrstudywatchapp.util
 import GetBLE
 import GetWiFi
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.*
 
 var BleData = mutableListOf<String>()
 var WifiData = mutableListOf<String>()
-var stop: Boolean = false
-class CreateCsv(context: Context,getCount: Int) {
+// stopフラグを定義する
+private var stopScanning = false
+class CreateCsv(var context: Context,getCount: Int) {
     var getCount=getCount
     var GetBle = GetBLE()
     var GetWiFi = GetWiFi(context)
-    var OtherFileStorage = OtherFileStorage(context, "${System.currentTimeMillis()}")
 
     var count = 0
 
-    fun createcsvdata(completion: () -> Unit) {
+    val OtherFileStorage = OtherFileStorage(context, "${System.currentTimeMillis()}")
+    // スキャンを実行する関数を修正する
+    fun createcsvdata(completion: (Boolean) -> Unit) {
         if (count < getCount) {
-            GetBle.startScan(count){bleResults->
-                if (stop){
-                    count=getCount
-                    completion()
-
-                }
-                BleData.addAll(bleResults)
-                val wifiResults = GetWiFi.getResults()
-                for (result in wifiResults) {
-                    val bssid = result.BSSID
-                    val level = result.level
-                    WifiData.add("$count,$level,$bssid")
-                }
-                count++
-                createcsvdata(completion) // 再帰的に次のスキャンを実行
+            if (stopScanning) {
+                stopScanning = false
+                count=0
+                // スキャンがキャンセルされた場合はコールバックを返さない
+                completion(false)
+                return
             }
+            GetBle.startScan(count) { bleResults ->
+
+                    BleData.addAll(bleResults)
+                    val wifiResults = GetWiFi.getResults()
+                    for (result in wifiResults) {
+                        val bssid = result.BSSID
+                        val level = result.level
+                        WifiData.add("$count,$level,$bssid,wifi")
+                    }
+                    count++
+                    createcsvdata(completion) // 再帰的に次のスキャンを実行
+                }
+
         } else {
             Savecsv()
-            completion()
-            count=0
-        // 5回のスキャンが終了したらコールバックを呼び出す
+            completion(true)
+            count = 0
+            stopScanning = false // スキャンが完了した後、stopフラグをリセットする
         }
     }
+
+
 
 
 
@@ -53,15 +62,18 @@ class CreateCsv(context: Context,getCount: Int) {
             Fpdata.add(result)
         }
         Fpdata.sortBy { it.split(",")[0].toInt() }
+        Fpdata.add(0,"gets,rssi,address,type")
         for (result in Fpdata) {
             OtherFileStorage.writeText(result)
         }
+
         BleData.clear()
         WifiData.clear()
     }
 }
 fun cancelScan() {
-    stop=true
+    Log.d("cancelScan","cancelS")
+    stopScanning = true
     BleData.clear()
     WifiData.clear()
 }

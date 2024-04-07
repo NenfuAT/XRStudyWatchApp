@@ -8,5 +8,10 @@ var imageFileName = mutableStateOf<String>("")
 var csvFilePath = mutableStateOf<String>("")
 var csvFileName = mutableStateOf<String>("")
 
-var scanCsvPath= mutableStateOf<String>("")
-var scanCsvName= mutableStateOf<String>("")
+var userId = mutableStateOf<String>("")
+var isServiceRunning = mutableStateOf<Boolean>(false)
+
+//スポット
+var spotObject = mutableListOf<Map<String,String>>()
+//近く
+var areaObject = mutableListOf<Map<String,String>>()

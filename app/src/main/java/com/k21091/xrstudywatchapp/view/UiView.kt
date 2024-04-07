@@ -1,6 +1,7 @@
 package com.k21091.xrstudywatchapp.view
 
 import Count1Min
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -32,9 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.k21091.xrstudywatchapp.MainActivity
 import com.k21091.xrstudywatchapp.service.SpotScanService
+
 import com.k21091.xrstudywatchapp.util.CreateCsv
 import com.k21091.xrstudywatchapp.util.cancelScan
-import com.k21091.xrstudywatchapp.util.stop
 import stopCountDown
 
 
@@ -62,9 +63,6 @@ fun LoginView(
         ) {
 
             LoginHome(modifier.align(Alignment.Center))
-
-            Button(onClick = toMain) {
-            }
         }
 
         if (loginButtonChecked.value) {
@@ -74,6 +72,9 @@ fun LoginView(
             )
         }
 
+        if (createUserButtonChecked.value) {
+            CreateUserMenu(modifier.align(Alignment.Center))
+        }
 
     }
 }
@@ -86,9 +87,22 @@ class UiView(private val context: Context, getContent: ActivityResultLauncher<St
     val serviceIntent = Intent(context, SpotScanService::class.java)
 
     init {
-        context.startService(serviceIntent)
+        if (!isServiceRunning(SpotScanService::class.java)) {
+            context.startService(serviceIntent)
+        }
     }
 
+
+
+    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
+        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager?
+        for (service in manager!!.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.name == service.service.className) {
+                return true
+            }
+        }
+        return false
+    }
     fun onUploadButtonClicked() {
         // もしオブジェクト近くのボタンが true なら、false に設定する
         if (nearObjectButtonChecked.value) {
@@ -96,14 +110,15 @@ class UiView(private val context: Context, getContent: ActivityResultLauncher<St
         }
         uploadButtonChecked.value = !uploadButtonChecked.value
         if (uploadButtonChecked.value) {
-            stop = false
 
             // サービスを停止
             context.stopService(serviceIntent)
         }
         if (!uploadButtonChecked.value) {
             selectedImageBitmapState.value = null
-            context.startService(serviceIntent)
+            if (!isServiceRunning(SpotScanService::class.java)) {
+                context.startService(serviceIntent)
+            }
             Menus.uploadpage = 0
             Menus.formMap.clear()
             Menus.formMap.apply {
@@ -127,7 +142,9 @@ class UiView(private val context: Context, getContent: ActivityResultLauncher<St
     fun onNearObjectButtonClicked() {
         // もしアップロードボタンが true なら、false に設定する
         if (uploadButtonChecked.value) {
-            context.startService(serviceIntent)
+            if (!isServiceRunning(SpotScanService::class.java)) {
+                context.startService(serviceIntent)
+            }
             uploadButtonChecked.value = false
             selectedImageBitmapState.value = null
             Menus.uploadpage = 0

@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,14 +54,20 @@ import androidx.compose.ui.unit.sp
 import com.k21091.xrstudywatchapp.R
 import com.k21091.xrstudywatchapp.util.CreateCsv
 import com.k21091.xrstudywatchapp.util.GetLocation
+import com.k21091.xrstudywatchapp.util.areaObject
 import com.k21091.xrstudywatchapp.util.buildJsonDataBody
 import com.k21091.xrstudywatchapp.util.buildMultipartFormDataBody
 import com.k21091.xrstudywatchapp.util.csvFilePath
 import com.k21091.xrstudywatchapp.util.imageFilePath
 import com.k21091.xrstudywatchapp.util.requestBodyToString
 import com.k21091.xrstudywatchapp.util.sendRequest
+import com.k21091.xrstudywatchapp.util.userId
+import kotlinx.serialization.Serializable
+import okhttp3.Credentials
+import okhttp3.Request
 import org.json.JSONException
 import org.json.JSONObject
+import java.io.File
 
 import kotlin.math.roundToInt
 
@@ -144,6 +152,7 @@ fun LoginMenu(
     toMain: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var loginResult by remember { mutableStateOf("") }
     val formMap by remember { mutableStateOf(mutableMapOf("email" to "", "password" to "")) }
 
 
@@ -158,9 +167,11 @@ fun LoginMenu(
         horizontalAlignment = Alignment.CenterHorizontally
     )
     {
-        Box(modifier = Modifier
-            .weight(0.6f)
-            .fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .weight(0.3f)
+                .fillMaxWidth()
+        ) {
             IconButton(
                 modifier = Modifier.align(Alignment.TopEnd),
                 onClick = { loginButtonChecked.value = false }
@@ -172,6 +183,20 @@ fun LoginMenu(
                 )
             }
         }
+        Box(
+            modifier = Modifier
+                .weight(0.3f)
+                .fillMaxWidth()
+        ) {
+            AutoResizeText(
+                text = loginResult,
+                fontSizeRange = FontSizeRange(min = 20.sp, max = 50.sp)
+            )
+            if (loginResult == "complete") {
+                toMain()
+            }
+        }
+
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -234,10 +259,10 @@ fun LoginMenu(
                 .align(Alignment.Center)
                 .clickable {
                     Log.d("form", "$formMap")
-                    var body=buildJsonDataBody(formMap)
+                    var body = buildJsonDataBody(formMap)
 
                     Log.d("body", requestBodyToString(body))
-                    sendRequest(body,"api/user/login",
+                    sendRequest(body, "","api/user/login",
                         onResponse = { response ->
                             // レスポンスが正常に受信された場合の処理
                             // ここで必要な処理を行います
@@ -247,9 +272,12 @@ fun LoginMenu(
                                 val error = jsonResponse.optString("error")
                                 if (error.isNotEmpty()) {
                                     println("Error received: $error")
+                                    loginResult = error
                                 } else {
                                     val id = jsonResponse.optString("id")
-                                    println("Response received: $id")
+                                    userId.value=id
+                                    println("Response received: $userId")
+                                    loginResult = "complete"
                                 }
                             } catch (e: JSONException) {
                                 e.printStackTrace()
@@ -260,7 +288,7 @@ fun LoginMenu(
                         onFailure = { errorMessage ->
                             // エラーが発生した場合の処理
                             println("Request failed with exception: $errorMessage")
-                            // ここでエラー処理を行います
+                            loginResult = "404NotFound"
                         }
                     )
                 }
@@ -271,6 +299,431 @@ fun LoginMenu(
                         .fillMaxSize(0.6f)
                         .align(Alignment.Center),
                     text = "ログイン",
+                    fontSizeRange = FontSizeRange(min = 30.sp, max = 60.sp),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CreateUserMenu(modifier: Modifier = Modifier) {
+    var createResult by remember { mutableStateOf("") }
+    var formState by remember { mutableStateOf(false) }
+    var male by remember { mutableStateOf(false) }
+    var female by remember { mutableStateOf(false) }
+    var other by remember { mutableStateOf(false) }
+    @Serializable
+    data class UserData(
+        var name: String? = null,
+        var email: String? = null,
+        var gender: String? = null,
+        var age: Int? = null,
+        var height: Int? = null,
+        var weight: Float? = null,
+        var occupation: String? = null,
+        var address: String? = null,
+        var password: String? = null
+    )
+
+    var Name by remember { mutableStateOf("") }
+    var Occupation by remember { mutableStateOf("") }
+    var Email by remember { mutableStateOf("") }
+    var Age by remember { mutableStateOf("") }
+    var Height by remember { mutableStateOf("") }
+    var Weight by remember { mutableStateOf("") }
+    var Address by remember { mutableStateOf("") }
+    var Password by remember { mutableStateOf("") }
+    val userData = UserData()
+
+
+    Column(
+        modifier = modifier
+            .fillMaxHeight(0.7f)
+            .fillMaxWidth(0.9f)
+            .background(
+                color = Color.LightGray,
+                shape = RoundedCornerShape(15.dp)
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    )
+    {
+        Box(
+            modifier = Modifier
+                .weight(0.7f)
+                .fillMaxWidth()
+        ) {
+            IconButton(
+                modifier = Modifier.align(Alignment.TopEnd),
+                onClick = { createUserButtonChecked.value = false }
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Back",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        Box (modifier = Modifier.weight(0.5f)){
+            AutoResizeText(
+                text = createResult,
+                fontSizeRange = FontSizeRange(min = 1.sp, max = 20.sp)
+            )
+            if (createResult == "complete") {
+                createUserButtonChecked.value=false
+            }
+        }
+        Row(modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth(0.9f))
+        {
+            Column(modifier = Modifier.weight(1f)) {
+                AutoResizeText(
+                    modifier = Modifier.weight(0.5f),
+                    text = "名前",
+                    fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
+                )
+                SearchTextField(
+                    value = Name,
+                    onValueChange = {
+                        Name = it
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            color = Color.Gray.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                )
+            }
+            Box (modifier = Modifier.weight(0.1f))
+            Column (modifier= Modifier.weight(1f)){
+                AutoResizeText(
+                    modifier=Modifier.weight(0.5f),
+                    text = "職業",
+                    fontSizeRange =FontSizeRange(min = 10.sp, max = 30.sp)
+                )
+
+                SearchTextField(
+                    value = Occupation,
+                    onValueChange = {
+                        Occupation = it
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            color = Color.Gray.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                )
+            }
+
+        }
+        Box (modifier = Modifier.weight(0.1f))
+        Column(modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth(0.9f)) {
+            AutoResizeText(
+                modifier = Modifier.weight(0.5f),
+                text = "メールアドレス",
+                fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
+            )
+
+            SearchTextField(
+                value = Email,
+                onValueChange = {
+                    Email = it
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        color = Color.Gray.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+            )
+        }
+        Box (modifier = Modifier.weight(0.1f))
+        Row(modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth(0.9f))
+        {
+            Column(modifier = Modifier.weight(1f)) {
+                AutoResizeText(
+                    modifier = Modifier.weight(0.5f),
+                    text = "年齢",
+                    fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
+                )
+
+                SearchTextField(
+                    value = Age,
+                    onValueChange = {
+                        Age = it
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            color = Color.Gray.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                )
+            }
+            Box (modifier = Modifier.weight(0.1f))
+            Column(modifier = Modifier.weight(1f)) {
+                AutoResizeText(
+                    modifier = Modifier.weight(0.5f),
+                    text = "身長",
+                    fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
+                )
+
+                SearchTextField(
+                    value = Height,
+                    onValueChange = {
+                        Height = it
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            color = Color.Gray.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                )
+
+
+            }
+            Box (modifier = Modifier.weight(0.1f))
+            Column(modifier = Modifier.weight(1f)) {
+                AutoResizeText(
+                    modifier = Modifier.weight(0.5f),
+                    text = "体重",
+                    fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
+                )
+
+                SearchTextField(
+                    value = Weight,
+                    onValueChange = {
+                        Weight = it
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            color = Color.Gray.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+                )
+
+
+            }
+        }
+        Box (modifier = Modifier.weight(0.1f))
+        Column(modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth(0.9f)) {
+            AutoResizeText(
+                modifier = Modifier.weight(0.5f),
+                text = "性別",
+                fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
+            )
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.weight(1f),contentAlignment = Alignment.Center){
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ){
+                        RadioButton(selected = male, onClick =
+                        {
+                            male=true
+                            female=false
+                            other=false
+                        },modifier=Modifier.weight(0.5f))
+                        AutoResizeText(
+                            modifier=Modifier.weight(1f),
+                            text = ":男性",
+                            fontSizeRange = FontSizeRange(min = 1.sp, max = 20.sp)
+                        )
+                    }
+
+                }
+                Box(modifier = Modifier.weight(1f)){
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ){
+                        RadioButton(selected = female, onClick =
+                        {
+                            male=false
+                            female=true
+                            other=false
+                        },modifier=Modifier.weight(0.5f))
+                        AutoResizeText(
+                            modifier=Modifier.weight(1f),
+                            text = ":女性",
+                            fontSizeRange = FontSizeRange(min = 1.sp, max = 20.sp)
+                        )
+                    }
+                }
+                Box(modifier = Modifier.weight(1f)){
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ){
+                        RadioButton(selected = other, onClick =
+                        {
+                            male=false
+                            female=false
+                            other=true
+
+                        },modifier=Modifier.weight(0.5f))
+                        AutoResizeText(
+                            modifier=Modifier.weight(1f),
+                            text = ":その他",
+                            fontSizeRange = FontSizeRange(min = 1.sp, max = 20.sp),
+                            maxLines = 1
+                        )
+                    }
+                }
+
+            }
+
+
+        }
+
+        Box (modifier = Modifier.weight(0.1f))
+        Column (modifier= Modifier
+            .weight(1f)
+            .fillMaxWidth(0.9f)){
+            AutoResizeText(
+                modifier=Modifier.weight(0.5f),
+                text = "住所",
+                fontSizeRange =FontSizeRange(min = 10.sp, max = 30.sp)
+            )
+
+            SearchTextField(
+                value = Address,
+                onValueChange = {
+                    Address = it
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        color = Color.Gray.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+            )
+        }
+        Box (modifier = Modifier.weight(0.1f))
+        Column (modifier= Modifier
+            .weight(1f)
+            .fillMaxWidth(0.9f)){
+            AutoResizeText(
+                modifier=Modifier.weight(0.5f),
+                text = "パスワード",
+                fontSizeRange =FontSizeRange(min = 10.sp, max = 30.sp)
+            )
+
+            SearchTextField(
+                value = Password,
+                onValueChange = {
+                    Password = it
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        color = Color.Gray.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
+            )
+        }
+        Box (modifier = Modifier
+            .weight(2f)
+            .fillMaxWidth(0.9f))
+        {
+            Box(modifier = Modifier
+                .fillMaxHeight(0.6f)
+                .fillMaxWidth()
+                .background(Color.Gray,shape = RoundedCornerShape(30.dp))
+                .align(Alignment.Center)
+                .clickable {
+                    userData.name=Name
+                    userData.occupation=Occupation
+                    userData.email=Email
+                    if (Age.isNotEmpty()) {
+                        userData.age=Age.toInt()
+                    }
+                    if (Height.isNotEmpty()) {
+                        userData.height=Height.toInt()
+                    }
+                    if (Weight.isNotEmpty()) {
+                        userData.weight=Weight.toFloat()
+                    }
+                    if (male){
+                        userData.gender="male"
+                    }
+                    if (female){
+                        userData.gender="female"
+                    }
+                    if (other){
+                        userData.gender="other"
+                    }
+                    userData.address=Address
+                    userData.password=Password
+
+
+
+                    Log.d("form", "$userData")
+                    val body = buildJsonDataBody(userData)
+
+                    Log.d("body", requestBodyToString(body))
+                    sendRequest(body, "","api/user/create",
+                        onResponse = { response ->
+                            // レスポンスが正常に受信された場合の処理
+                            // ここで必要な処理を行います
+
+                            try {
+                                val jsonResponse = JSONObject(response.toString())
+                                val error = jsonResponse.optString("error")
+                                if (error.isNotEmpty()) {
+                                    println("Error received: $error")
+                                    createResult = error
+                                } else {
+                                    val id = jsonResponse.optString("id")
+                                    println("Response received: $id")
+                                    createResult = "complete"
+                                }
+                            } catch (e: JSONException) {
+                                e.printStackTrace()
+                                // JSONのパースエラーが発生した場合の処理
+                            }
+
+                        },
+                        onFailure = { errorMessage ->
+                            // エラーが発生した場合の処理
+                            println("Request failed with exception: $errorMessage")
+                            createResult = "404NotFound"
+                        }
+                    )
+                }
+            )
+            {
+                AutoResizeText(
+                    modifier = Modifier
+                        .fillMaxSize(0.6f)
+                        .align(Alignment.Center),
+                    text = "登録",
                     fontSizeRange = FontSizeRange(min = 30.sp, max = 60.sp),
                     textAlign = TextAlign.Center
                 )
@@ -970,27 +1423,29 @@ fun CountDownCanvas(
                                 state.value = 2
                             }
                         }
-                        var CreateCsv = CreateCsv(context, 5)
+                        var CreateCsv = CreateCsv(context, 10)
                         state.value = 1
                         CreateCsv.createcsvdata {
                             if (ui.uploadButtonChecked.value) {
                                 var GetLocation = GetLocation(context)
                                 var locations = GetLocation.getLatitudeAndLongitudeAsString()
-                                formMap["latitude"]= locations?.get("latitude") ?: ""
-                                formMap["longitude"]=locations?.get("longitude") ?: ""
+                                formMap["latitude"] = locations?.get("latitude") ?: ""
+                                formMap["longitude"] = locations?.get("longitude") ?: ""
                                 fileList.add(Pair("rawDataFile", csvFilePath.value))
                                 fileList.add(Pair("objectFile", imageFilePath.value))
                                 var body = buildMultipartFormDataBody(formMap, fileList)
-                                Log.d("body", requestBodyToString(body))
-                                sendRequest(body,"api/object/create",
+
+                                sendRequest(body, userId.value,"api/object/create",
                                     onResponse = { response ->
                                         // レスポンスが正常に受信された場合の処理
                                         println("Response received: $response")
+                                        File(csvFilePath.value).delete()
                                         // ここで必要な処理を行います
                                     }
                                 ) { errorMessage ->
                                     // エラーが発生した場合の処理
                                     println("Request failed with exception: $errorMessage")
+                                    File(csvFilePath.value).delete()
                                     // ここでエラー処理を行います
                                 }
                             }

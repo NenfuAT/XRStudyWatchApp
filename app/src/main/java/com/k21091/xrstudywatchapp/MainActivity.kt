@@ -44,7 +44,7 @@ import com.k21091.xrstudywatchapp.ar.helpers.InstantPlacementSettings
 import com.k21091.xrstudywatchapp.ar.samplerender.SampleRender
 import com.k21091.xrstudywatchapp.ar.kotlin.ArRenderer
 import com.k21091.xrstudywatchapp.ar.kotlin.ArView
-import com.k21091.xrstudywatchapp.service.SpotScanService
+import com.k21091.xrstudywatchapp.ar.kotlin.ObjectRenderer
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
 import com.k21091.xrstudywatchapp.util.imageFileName
 import com.k21091.xrstudywatchapp.util.imageFilePath
@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
     lateinit var arCoreSessionHelper: ARCoreSessionLifecycleHelper
     lateinit var view: ArView
     lateinit var renderer: ArRenderer
+    //lateinit var renderer: ObjectRenderer
 
     //private var selectedImageBitmapState = mutableStateOf<ImageBitmap?>(null)
     lateinit var getContent: ActivityResultLauncher<String>
@@ -74,6 +75,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         val permissions = arrayOf(
             Manifest.permission.ACCESS_WIFI_STATE,
             Manifest.permission.BLUETOOTH_ADMIN ,
@@ -129,6 +131,7 @@ class MainActivity : ComponentActivity() {
 
         // Set up the Hello AR renderer.
         renderer = ArRenderer(this)
+        //renderer = ObjectRenderer(this)
         lifecycle.addObserver(renderer)
 
         // Set up Hello AR UI.
@@ -148,7 +151,13 @@ class MainActivity : ComponentActivity() {
 
         // setContent の後に配置する
         setContent {
-            Root()
+            Box(modifier = Modifier.fillMaxSize()) {
+                AndroidView(factory = {
+                    view.surfaceView
+                })
+                // NavHostを含むRootコンポーザブル関数を呼び出す
+                Root()
+            }
         }
     }
 
@@ -255,7 +264,6 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun MainView() = XRStudyWatchAppTheme {
         val ui=UiView(this,getContent)
-        //OpenGLView()
         ui.Buttonlayout()
         ui.Menulayout()
     }

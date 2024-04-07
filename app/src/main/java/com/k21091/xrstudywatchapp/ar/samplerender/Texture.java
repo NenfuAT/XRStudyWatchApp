@@ -17,6 +17,13 @@ package com.k21091.xrstudywatchapp.ar.samplerender;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES30;
 import android.util.Log;
@@ -168,6 +175,116 @@ public class Texture implements Closeable {
     }
     return texture;
   }
+
+  public static Bitmap adjustSaturation(Bitmap bitmap, float saturationFactor) {
+    Bitmap adjustedBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), bitmap.getConfig());
+    Canvas canvas = new Canvas(adjustedBitmap);
+    Paint paint = new Paint();
+
+    ColorMatrix colorMatrix = new ColorMatrix();
+    colorMatrix.setSaturation(saturationFactor);
+
+    ColorMatrixColorFilter filter = new ColorMatrixColorFilter(colorMatrix);
+    paint.setColorFilter(filter);
+    canvas.drawBitmap(bitmap, 0, 0, paint);
+
+    return adjustedBitmap;
+  }
+
+  public static Bitmap increaseBrightness(Bitmap bitmap, float value) {
+    Bitmap adjustedBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), bitmap.getConfig());
+
+    int width = bitmap.getWidth();
+    int height = bitmap.getHeight();
+    int[] pixels = new int[width * height];
+
+    // ピクセルデータを取得
+    bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+
+    // ピクセルデータを変更
+    for (int i = 0; i < pixels.length; i++) {
+      int pixel = pixels[i];
+      int alpha = (pixel >> 24) & 0xFF;
+      int red = (pixel >> 16) & 0xFF;
+      int green = (pixel >> 8) & 0xFF;
+      int blue = pixel & 0xFF;
+
+      // RGB値に明度の変更を適用
+      red = (int) Math.min(255, red + value);
+      green = (int) Math.min(255, green + value);
+      blue = (int) Math.min(255, blue + value);
+
+      // 調整されたピクセルをセット
+      pixels[i] = (alpha << 24) | (red << 16) | (green << 8) | blue;
+    }
+
+    // 変更されたピクセルデータを調整されたビットマップにセット
+    adjustedBitmap.setPixels(pixels, 0, width, 0, 0, width, height);
+
+    return adjustedBitmap;
+  }
+
+  public static Texture createFromBitmap(
+          SampleRender render, Bitmap bitmap, WrapMode wrapMode, ColorFormat colorFormat, float brightness,float saturation) {
+    // 明度を上げる
+    Bitmap adjustedBitmap = increaseBrightness(bitmap, brightness);
+    adjustedBitmap = increaseBrightness(adjustedBitmap, brightness);
+
+    // 明度を上げたビットマップからテクスチャを作成する
+    Texture texture = new Texture(render, Target.TEXTURE_2D, wrapMode);
+    ByteBuffer buffer = null;
+    try {
+      // Adjusted bitmapからピクセルデータを取得
+      buffer = ByteBuffer.allocateDirect(adjustedBitmap.getByteCount());
+      adjustedBitmap.copyPixelsToBuffer(buffer);
+      buffer.rewind();
+
+      GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, texture.getTextureId());
+      GLError.maybeThrowGLException("Failed to bind texture", "glBindTexture");
+      GLES30.glTexImage2D(
+              GLES30.GL_TEXTURE_2D,
+              0,
+              colorFormat.glesEnum,
+              adjustedBitmap.getWidth(),
+              adjustedBitmap.getHeight(),
+              0,
+              GLES30.GL_RGBA,
+              GLES30.GL_UNSIGNED_BYTE,
+              buffer);
+      GLError.maybeThrowGLException("Failed to populate texture data", "glTexImage2D");
+      GLES30.glGenerateMipmap(GLES30.GL_TEXTURE_2D);
+      GLError.maybeThrowGLException("Failed to generate mipmaps", "glGenerateMipmap");
+    } catch (Throwable t) {
+      texture.close();
+      throw t;
+    } finally {
+      if (buffer != null) {
+        buffer.clear();
+      }
+      adjustedBitmap.recycle(); // メモリを解放するためにビットマップを破棄する
+    }
+    return texture;
+  }
+
+  public static Bitmap createWhiteBitmap(Bitmap bitmap, float brightness, float saturation) {
+    // 明度を上げる
+    Bitmap adjustedBitmap = increaseBrightness(bitmap, brightness);
+
+    // 彩度を調整
+    adjustedBitmap = adjustSaturation(adjustedBitmap, saturation);
+
+    // 全てのピクセルを白色に変更
+    Bitmap whiteBitmap = Bitmap.createBitmap(adjustedBitmap.getWidth(), adjustedBitmap.getHeight(), adjustedBitmap.getConfig());
+    Canvas canvas = new Canvas(whiteBitmap);
+    canvas.drawColor(Color.WHITE);
+    Paint paint = new Paint();
+    paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OVER));
+    canvas.drawBitmap(adjustedBitmap, 0, 0, paint);
+
+    return whiteBitmap;
+  }
+
+
 
   @Override
   public void close() {

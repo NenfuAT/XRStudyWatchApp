@@ -28,6 +28,7 @@ import com.google.ar.core.InstantPlacementPoint
 import com.google.ar.core.LightEstimate
 import com.google.ar.core.Plane
 import com.google.ar.core.Point
+import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.Trackable
 import com.google.ar.core.TrackingFailureReason
@@ -48,6 +49,7 @@ import com.k21091.xrstudywatchapp.ar.samplerender.VertexBuffer
 import com.k21091.xrstudywatchapp.ar.samplerender.arcore.BackgroundRenderer
 import com.k21091.xrstudywatchapp.ar.samplerender.arcore.PlaneRenderer
 import com.k21091.xrstudywatchapp.ar.samplerender.arcore.SpecularCubemapFilter
+import com.k21091.xrstudywatchapp.util.doInBackground
 import java.io.IOException
 import java.nio.ByteBuffer
 
@@ -177,11 +179,11 @@ class ArRenderer(val activity: MainActivity) :
       GLError.maybeThrowGLException("Failed to bind DFG texture", "glBindTexture")
       GLES30.glTexImage2D(
         GLES30.GL_TEXTURE_2D,
-        /* p1 = */ 0,
+        /*level=*/ 0,
         GLES30.GL_RG16F,
-        /* p3 = */ dfgResolution,
-        /* p4 = */ dfgResolution,
-        /* p5 = */ 0,
+        /*width=*/ dfgResolution,
+        /*height=*/ dfgResolution,
+        /*border=*/ 0,
         GLES30.GL_RG,
         GLES30.GL_HALF_FLOAT,
         buffer
@@ -205,32 +207,45 @@ class ArRenderer(val activity: MainActivity) :
       val pointCloudVertexBuffers = arrayOf(pointCloudVertexBuffer)
       pointCloudMesh =
         Mesh(render, Mesh.PrimitiveMode.POINTS, /*indexBuffer=*/ null, pointCloudVertexBuffers)
-
+      val imageUrl = "https://pve01-storage-server.karasuneo.com/applications/01F8VYXK67BGC1F9RP1E4S9YTV/objects/01HTSFXDKKZ7TGPGWXGBDFG9Z6.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=4SVrbRAaIzNOThRz%2F20240406%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=20240406T104431Z&X-Amz-Expires=1200&X-Amz-Signature=90e8c43921b78940e597fc453a02def0ae22cb7d67ca3c9376266289cf9a6709&X-Amz-SignedHeaders=host&x-id=GetObject"
+      val bitmap=doInBackground(imageUrl)
       // Virtual object to render (ARCore pawn)
       virtualObjectAlbedoTexture =
-        Texture.createFromAsset(
+        Texture.createFromBitmap(
           render,
-          "models/pawn_albedo.png",
+          bitmap,
           Texture.WrapMode.CLAMP_TO_EDGE,
-          Texture.ColorFormat.SRGB
+          Texture.ColorFormat.SRGB,
+          2.0f,
+          1.0f
         )
 
       virtualObjectAlbedoInstantPlacementTexture =
-        Texture.createFromAsset(
+        Texture.createFromBitmap(
           render,
-          "models/pawn_albedo_instant_placement.png",
+          bitmap,
           Texture.WrapMode.CLAMP_TO_EDGE,
-          Texture.ColorFormat.SRGB
+          Texture.ColorFormat.LINEAR,
+          1.2f,
+          3.0f
         )
 
       val virtualObjectPbrTexture =
-        Texture.createFromAsset(
+        Texture.createFromBitmap(
           render,
-          "models/pawn_roughness_metallic_ao.png",
+          Texture.createWhiteBitmap(bitmap,1f,1f),
           Texture.WrapMode.CLAMP_TO_EDGE,
-          Texture.ColorFormat.LINEAR
+          Texture.ColorFormat.SRGB,
+          1f,
+          1f
         )
-      virtualObjectMesh = Mesh.createFromAsset(render, "models/pawn.obj")
+
+      if (bitmap != null) {
+        bitmap.recycle()
+      }
+      //virtualObjectMesh = Mesh.createFromAsset(render, "models/pawn.obj")
+
+      virtualObjectMesh = Mesh.createPlaneMeshFromBitmap(render, bitmap)
       virtualObjectShader =
         Shader.createFromAssets(
           render,
@@ -316,6 +331,7 @@ class ArRenderer(val activity: MainActivity) :
 
     // Handle one tap per frame.
     handleTap(frame, camera)
+    //placeAnchorOnVerticalPlane(frame,camera)
 
     // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
     trackingStateHelper.updateKeepScreenOnFlag(camera.trackingState)
@@ -523,6 +539,49 @@ class ArRenderer(val activity: MainActivity) :
       activity.runOnUiThread { activity.view.showOcclusionDialogIfNeeded() }
     }
   }
+
+
+
+
+  private var isAnchorPlaced = false // アンカーが設置されたかどうかを示すフラグ
+
+  private fun placeAnchorOnVerticalPlane(frame: Frame, camera: Camera) {
+    if (camera.trackingState != TrackingState.TRACKING || isAnchorPlaced) return
+
+    // 垂直な平面を検出する
+    val verticalPlane = frame.getUpdatedTrackables(Plane::class.java)
+      .firstOrNull { plane ->
+        // 平面の法線ベクトルを取得
+        val planeNormal = plane.centerPose.zAxis
+        // 法線ベクトルのY成分を取得
+        val planeNormalY = planeNormal[1] // Y成分はインデックス1にある
+        // 法線ベクトルのY成分が上向きまたは下向きであるかを確認
+        val isVertical = planeNormalY > 0.9 || planeNormalY < -0.9
+        // 垂直な平面かどうかを返す
+        isVertical
+      }
+
+
+    if (verticalPlane != null) {
+      val centerPose = verticalPlane!!.centerPose
+      // アンカーを設置する
+      val hitTestResult = frame.hitTestInstantPlacement(centerPose.tx(), centerPose.ty(), APPROXIMATE_DISTANCE_METERS)
+        .firstOrNull()
+      if (hitTestResult != null) {
+        // アンカーを設置
+        val anchor = hitTestResult.createAnchor()
+        // アンカーをリストに追加
+        wrappedAnchors.add(WrappedAnchor(anchor, verticalPlane))
+        // アンカーが設置されたことを記録
+        isAnchorPlaced = true
+        // 必要な場合はUIスレッド上で処理を行う
+        activity.runOnUiThread {
+          activity.view.showOcclusionDialogIfNeeded()
+        }
+      }
+    }
+  }
+
 
   private fun showError(errorMessage: String) =
     activity.view.snackbarHelper.showError(activity, errorMessage)
