@@ -100,7 +100,7 @@ fun guessMediaType(fileName: String): MediaType? {
     val extension = fileName.substringAfterLast(".", "")
     return when (extension.toLowerCase()) {
         "png" -> "image/png".toMediaTypeOrNull()
-        "jpg", "jpeg" -> "image/jpeg".toMediaTypeOrNull()
+        "jpg", "jpeg"  -> "image/jpeg".toMediaTypeOrNull()
         "pdf" -> "application/pdf".toMediaTypeOrNull()
         "csv" -> "text/csv".toMediaTypeOrNull()
         else -> "application/octet-stream".toMediaTypeOrNull()

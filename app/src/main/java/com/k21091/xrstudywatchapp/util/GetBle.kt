@@ -2,9 +2,12 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Handler
+import android.os.ParcelUuid
 import android.util.Log
 
 class GetBLE{
@@ -14,7 +17,7 @@ class GetBLE{
 
     var blestop = false
 
-    private val SCAN_PERIOD: Long = 5000
+    private val SCAN_PERIOD: Long = 1500
     private var results = mutableListOf<String>()
     private var scanCallback: ScanCallback? = null
 
@@ -54,6 +57,7 @@ class GetBLE{
             }
         }
     }
+
 
     @SuppressLint("MissingPermission")
     fun stopScan() {

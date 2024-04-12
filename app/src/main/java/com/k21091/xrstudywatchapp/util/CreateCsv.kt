@@ -10,16 +10,19 @@ var BleData = mutableListOf<String>()
 var WifiData = mutableListOf<String>()
 // stopフラグを定義する
 private var stopScanning = false
-class CreateCsv(var context: Context,getCount: Int) {
+class CreateCsv(var context: Context,getCount: Int,val type:String) {
     var getCount=getCount
     var GetBle = GetBLE()
     var GetWiFi = GetWiFi(context)
 
     var count = 0
 
-    val OtherFileStorage = OtherFileStorage(context, "${System.currentTimeMillis()}")
+    lateinit var  OtherFileStorage:OtherFileStorage
     // スキャンを実行する関数を修正する
     fun createcsvdata(completion: (Boolean) -> Unit) {
+        if (count==0){
+            OtherFileStorage = OtherFileStorage(context, "${System.currentTimeMillis()}${type}",type)
+        }
         if (count < getCount) {
             if (stopScanning) {
                 stopScanning = false

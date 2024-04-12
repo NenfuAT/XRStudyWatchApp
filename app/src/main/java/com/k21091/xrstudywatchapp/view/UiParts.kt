@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -29,10 +30,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +48,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -52,22 +56,21 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.k21091.xrstudywatchapp.R
+import com.k21091.xrstudywatchapp.service.latitude
+import com.k21091.xrstudywatchapp.service.longitude
 import com.k21091.xrstudywatchapp.util.CreateCsv
-import com.k21091.xrstudywatchapp.util.GetLocation
 import com.k21091.xrstudywatchapp.util.areaObject
 import com.k21091.xrstudywatchapp.util.buildJsonDataBody
 import com.k21091.xrstudywatchapp.util.buildMultipartFormDataBody
-import com.k21091.xrstudywatchapp.util.csvFilePath
 import com.k21091.xrstudywatchapp.util.imageFilePath
 import com.k21091.xrstudywatchapp.util.requestBodyToString
+import com.k21091.xrstudywatchapp.util.searchobject
 import com.k21091.xrstudywatchapp.util.sendRequest
+import com.k21091.xrstudywatchapp.util.uploadFilePath
 import com.k21091.xrstudywatchapp.util.userId
 import kotlinx.serialization.Serializable
-import okhttp3.Credentials
-import okhttp3.Request
 import org.json.JSONException
 import org.json.JSONObject
-import java.io.File
 
 import kotlin.math.roundToInt
 
@@ -262,7 +265,7 @@ fun LoginMenu(
                     var body = buildJsonDataBody(formMap)
 
                     Log.d("body", requestBodyToString(body))
-                    sendRequest(body, "","api/user/login",
+                    sendRequest(body, "", "api/user/login",
                         onResponse = { response ->
                             // レスポンスが正常に受信された場合の処理
                             // ここで必要な処理を行います
@@ -275,7 +278,7 @@ fun LoginMenu(
                                     loginResult = error
                                 } else {
                                     val id = jsonResponse.optString("id")
-                                    userId.value=id
+                                    userId.value = id
                                     println("Response received: $userId")
                                     loginResult = "complete"
                                 }
@@ -314,6 +317,7 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
     var male by remember { mutableStateOf(false) }
     var female by remember { mutableStateOf(false) }
     var other by remember { mutableStateOf(false) }
+
     @Serializable
     data class UserData(
         var name: String? = null,
@@ -365,18 +369,20 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
                 )
             }
         }
-        Box (modifier = Modifier.weight(0.5f)){
+        Box(modifier = Modifier.weight(0.5f)) {
             AutoResizeText(
                 text = createResult,
                 fontSizeRange = FontSizeRange(min = 1.sp, max = 20.sp)
             )
             if (createResult == "complete") {
-                createUserButtonChecked.value=false
+                createUserButtonChecked.value = false
             }
         }
-        Row(modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth(0.9f))
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.9f)
+        )
         {
             Column(modifier = Modifier.weight(1f)) {
                 AutoResizeText(
@@ -398,12 +404,12 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
                         .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
                 )
             }
-            Box (modifier = Modifier.weight(0.1f))
-            Column (modifier= Modifier.weight(1f)){
+            Box(modifier = Modifier.weight(0.1f))
+            Column(modifier = Modifier.weight(1f)) {
                 AutoResizeText(
-                    modifier=Modifier.weight(0.5f),
+                    modifier = Modifier.weight(0.5f),
                     text = "職業",
-                    fontSizeRange =FontSizeRange(min = 10.sp, max = 30.sp)
+                    fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
                 )
 
                 SearchTextField(
@@ -422,10 +428,12 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
             }
 
         }
-        Box (modifier = Modifier.weight(0.1f))
-        Column(modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth(0.9f)) {
+        Box(modifier = Modifier.weight(0.1f))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.9f)
+        ) {
             AutoResizeText(
                 modifier = Modifier.weight(0.5f),
                 text = "メールアドレス",
@@ -446,10 +454,12 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
                     .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
             )
         }
-        Box (modifier = Modifier.weight(0.1f))
-        Row(modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth(0.9f))
+        Box(modifier = Modifier.weight(0.1f))
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.9f)
+        )
         {
             Column(modifier = Modifier.weight(1f)) {
                 AutoResizeText(
@@ -472,7 +482,7 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
                         .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
                 )
             }
-            Box (modifier = Modifier.weight(0.1f))
+            Box(modifier = Modifier.weight(0.1f))
             Column(modifier = Modifier.weight(1f)) {
                 AutoResizeText(
                     modifier = Modifier.weight(0.5f),
@@ -496,7 +506,7 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
 
 
             }
-            Box (modifier = Modifier.weight(0.1f))
+            Box(modifier = Modifier.weight(0.1f))
             Column(modifier = Modifier.weight(1f)) {
                 AutoResizeText(
                     modifier = Modifier.weight(0.5f),
@@ -521,10 +531,12 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
 
             }
         }
-        Box (modifier = Modifier.weight(0.1f))
-        Column(modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth(0.9f)) {
+        Box(modifier = Modifier.weight(0.1f))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.9f)
+        ) {
             AutoResizeText(
                 modifier = Modifier.weight(0.5f),
                 text = "性別",
@@ -534,60 +546,66 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.weight(1f),contentAlignment = Alignment.Center){
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Start
-                    ){
-                        RadioButton(selected = male, onClick =
-                        {
-                            male=true
-                            female=false
-                            other=false
-                        },modifier=Modifier.weight(0.5f))
+                    ) {
+                        RadioButton(
+                            selected = male, onClick =
+                            {
+                                male = true
+                                female = false
+                                other = false
+                            }, modifier = Modifier.weight(0.5f)
+                        )
                         AutoResizeText(
-                            modifier=Modifier.weight(1f),
+                            modifier = Modifier.weight(1f),
                             text = ":男性",
                             fontSizeRange = FontSizeRange(min = 1.sp, max = 20.sp)
                         )
                     }
 
                 }
-                Box(modifier = Modifier.weight(1f)){
+                Box(modifier = Modifier.weight(1f)) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Start
-                    ){
-                        RadioButton(selected = female, onClick =
-                        {
-                            male=false
-                            female=true
-                            other=false
-                        },modifier=Modifier.weight(0.5f))
+                    ) {
+                        RadioButton(
+                            selected = female, onClick =
+                            {
+                                male = false
+                                female = true
+                                other = false
+                            }, modifier = Modifier.weight(0.5f)
+                        )
                         AutoResizeText(
-                            modifier=Modifier.weight(1f),
+                            modifier = Modifier.weight(1f),
                             text = ":女性",
                             fontSizeRange = FontSizeRange(min = 1.sp, max = 20.sp)
                         )
                     }
                 }
-                Box(modifier = Modifier.weight(1f)){
+                Box(modifier = Modifier.weight(1f)) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Start
-                    ){
-                        RadioButton(selected = other, onClick =
-                        {
-                            male=false
-                            female=false
-                            other=true
+                    ) {
+                        RadioButton(
+                            selected = other, onClick =
+                            {
+                                male = false
+                                female = false
+                                other = true
 
-                        },modifier=Modifier.weight(0.5f))
+                            }, modifier = Modifier.weight(0.5f)
+                        )
                         AutoResizeText(
-                            modifier=Modifier.weight(1f),
+                            modifier = Modifier.weight(1f),
                             text = ":その他",
                             fontSizeRange = FontSizeRange(min = 1.sp, max = 20.sp),
                             maxLines = 1
@@ -600,14 +618,16 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
 
         }
 
-        Box (modifier = Modifier.weight(0.1f))
-        Column (modifier= Modifier
-            .weight(1f)
-            .fillMaxWidth(0.9f)){
+        Box(modifier = Modifier.weight(0.1f))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.9f)
+        ) {
             AutoResizeText(
-                modifier=Modifier.weight(0.5f),
+                modifier = Modifier.weight(0.5f),
                 text = "住所",
-                fontSizeRange =FontSizeRange(min = 10.sp, max = 30.sp)
+                fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
             )
 
             SearchTextField(
@@ -624,14 +644,16 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
                     .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
             )
         }
-        Box (modifier = Modifier.weight(0.1f))
-        Column (modifier= Modifier
-            .weight(1f)
-            .fillMaxWidth(0.9f)){
+        Box(modifier = Modifier.weight(0.1f))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(0.9f)
+        ) {
             AutoResizeText(
-                modifier=Modifier.weight(0.5f),
+                modifier = Modifier.weight(0.5f),
                 text = "パスワード",
-                fontSizeRange =FontSizeRange(min = 10.sp, max = 30.sp)
+                fontSizeRange = FontSizeRange(min = 10.sp, max = 30.sp)
             )
 
             SearchTextField(
@@ -648,39 +670,41 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
                     .border(1.dp, Color.Gray, shape = RoundedCornerShape(10.dp))
             )
         }
-        Box (modifier = Modifier
-            .weight(2f)
-            .fillMaxWidth(0.9f))
+        Box(
+            modifier = Modifier
+                .weight(2f)
+                .fillMaxWidth(0.9f)
+        )
         {
             Box(modifier = Modifier
                 .fillMaxHeight(0.6f)
                 .fillMaxWidth()
-                .background(Color.Gray,shape = RoundedCornerShape(30.dp))
+                .background(Color.Gray, shape = RoundedCornerShape(30.dp))
                 .align(Alignment.Center)
                 .clickable {
-                    userData.name=Name
-                    userData.occupation=Occupation
-                    userData.email=Email
+                    userData.name = Name
+                    userData.occupation = Occupation
+                    userData.email = Email
                     if (Age.isNotEmpty()) {
-                        userData.age=Age.toInt()
+                        userData.age = Age.toInt()
                     }
                     if (Height.isNotEmpty()) {
-                        userData.height=Height.toInt()
+                        userData.height = Height.toInt()
                     }
                     if (Weight.isNotEmpty()) {
-                        userData.weight=Weight.toFloat()
+                        userData.weight = Weight.toFloat()
                     }
-                    if (male){
-                        userData.gender="male"
+                    if (male) {
+                        userData.gender = "male"
                     }
-                    if (female){
-                        userData.gender="female"
+                    if (female) {
+                        userData.gender = "female"
                     }
-                    if (other){
-                        userData.gender="other"
+                    if (other) {
+                        userData.gender = "other"
                     }
-                    userData.address=Address
-                    userData.password=Password
+                    userData.address = Address
+                    userData.password = Password
 
 
 
@@ -688,7 +712,7 @@ fun CreateUserMenu(modifier: Modifier = Modifier) {
                     val body = buildJsonDataBody(userData)
 
                     Log.d("body", requestBodyToString(body))
-                    sendRequest(body, "","api/user/create",
+                    sendRequest(body, "", "api/user/create",
                         onResponse = { response ->
                             // レスポンスが正常に受信された場合の処理
                             // ここで必要な処理を行います
@@ -769,6 +793,9 @@ class ButtonParts(private val ui: UiView) {
 
     @Composable
     fun NearObjectMenuButton() {
+        var areaobject= remember {
+            areaObject
+        }
         IconToggleButton(
             checked = remember {
                 ui.nearObjectButtonChecked.value
@@ -788,18 +815,28 @@ class ButtonParts(private val ui: UiView) {
                     tint = Color(0xFF000000),
                     modifier = iconModifier
                 )
-            } else Icon(
-                painter = painterResource(R.drawable.kid_star),
-                contentDescription = "アップロード",
-                tint = Color(0xFF000000),
-                modifier = iconModifier
-            )
+            } else
+                Box(modifier = Modifier){
+                    Icon(
+                        painter = painterResource(R.drawable.kid_star),
+                        contentDescription = "アップロード",
+                        tint = Color(0xFF000000),
+                        modifier = iconModifier
+                    )
+                    Text(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(top = 1.dp),
+                        text = "${areaobject.value.size}"
+                    )
+                }
         }
     }
 }
 
 class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<String>) {
     var uploadpage by mutableStateOf(0)
+    var uploadResult by mutableStateOf("")
 
     val formMap = mutableMapOf<String, String>().apply {
         put("university", "ホゲ大学")
@@ -955,6 +992,11 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
     fun UploadMenu(
         getContent: ActivityResultLauncher<String>
     ) {
+
+        val uploadResult= remember {
+            uploadResult
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxHeight(0.95f)
@@ -1329,7 +1371,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             modifier = Modifier
                                 .fillMaxHeight(0.9f)
                                 .fillMaxWidth(),
-                            text = "アップロード完了",
+                            text = uploadResult,
                             fontSizeRange = FontSizeRange(min = 10.sp, max = 50.sp),
                             textAlign = TextAlign.Center,
                             maxLines = 1
@@ -1345,20 +1387,91 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
 
     @Composable
     fun NearObjectMenu() {
+        var nowareaObject by remember { areaObject }
         LazyColumn(
             modifier = Modifier
                 .fillMaxHeight(0.95f)
                 .fillMaxWidth(0.95f)
         ) {
-            item() {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight(0.3f)
-                        .fillMaxWidth()
-
-                ) {
-
+            items(nowareaObject.keys.size) { index ->
+                val key = nowareaObject.keys.toList()[index] // インデックスを使用してキーを取得します
+                val areaobject = nowareaObject[key] // キーを使用してareaObjectから値を取得します
+                if (areaobject != null) {
+                    println(areaobject)
                 }
+                Row(
+                    modifier = Modifier
+                        .padding(0.dp, LocalConfiguration.current.screenHeightDp.dp / 200)
+                        .height(LocalConfiguration.current.screenHeightDp.dp / 6) // 画面の高さ/6
+                        .fillMaxWidth()
+                        .border(1.dp, Color.Gray, RoundedCornerShape(10.dp)),
+                    verticalAlignment = Alignment.CenterVertically
+                )
+                {
+                    Box(modifier = Modifier.weight(0.05f))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight(0.85f)
+                            .weight(1f)
+                    ) {
+                        if (areaobject != null) {
+                            AutoResizeText(
+                                modifier = Modifier.weight(1f),
+                                text = areaobject.university.name,
+                                fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp)
+                            )
+                            AutoResizeText(
+                                modifier = Modifier.weight(1f),
+                                text = "${areaobject.university.undergraduate} ${areaobject.university.department}",
+                                fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp)
+                            )
+                            AutoResizeText(
+                                modifier = Modifier.weight(1f),
+                                text = "${areaobject.laboratory.location} ${areaobject.laboratory.roomNum}",
+                                fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp)
+                            )
+                            AutoResizeText(
+                                modifier = Modifier.weight(1f),
+                                text = areaobject.laboratory.name,
+                                fontSizeRange = FontSizeRange(min = 10.sp, max = 20.sp)
+                            )
+                        }
+
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight(0.85f)
+                            .weight(0.3f),
+                        contentAlignment = Alignment.BottomEnd
+                    ) {
+                        Box(
+                            modifier = Modifier
+
+                                .fillMaxWidth(0.5f)
+                                .aspectRatio(1f)
+                                .background(
+                                    color = Color.White.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(5.dp)
+                                )
+                                .border(1.dp, Color.Gray, RoundedCornerShape(5.dp))
+                                .clickable {
+                                    searchobject.value = areaobject
+                                    ui.onNearObjectButtonClicked()
+                                },
+                            contentAlignment = Alignment.Center
+                        ){
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "探す",
+                                tint = Color(0xFF000000),
+                                modifier = Modifier.fillMaxSize(0.7f)
+                            )
+                        }
+                    }
+                    Box(modifier = Modifier.weight(0.05f))
+                }
+
+
             }
 
         }
@@ -1423,29 +1536,28 @@ fun CountDownCanvas(
                                 state.value = 2
                             }
                         }
-                        var CreateCsv = CreateCsv(context, 10)
+                        var CreateCsv = CreateCsv(context, 30, "upload")
                         state.value = 1
                         CreateCsv.createcsvdata {
                             if (ui.uploadButtonChecked.value) {
-                                var GetLocation = GetLocation(context)
-                                var locations = GetLocation.getLatitudeAndLongitudeAsString()
-                                formMap["latitude"] = locations?.get("latitude") ?: ""
-                                formMap["longitude"] = locations?.get("longitude") ?: ""
-                                fileList.add(Pair("rawDataFile", csvFilePath.value))
+
+                                formMap["latitude"] = latitude
+                                formMap["longitude"] = longitude
+                                fileList.add(Pair("rawDataFile", uploadFilePath.value))
                                 fileList.add(Pair("objectFile", imageFilePath.value))
                                 var body = buildMultipartFormDataBody(formMap, fileList)
 
-                                sendRequest(body, userId.value,"api/object/create",
-                                    onResponse = { response ->
+                                sendRequest(body, userId.value, "api/object/create",
+                                  onResponse = { response ->
                                         // レスポンスが正常に受信された場合の処理
                                         println("Response received: $response")
-                                        File(csvFilePath.value).delete()
+                                        //File(csvFilePath.value).delete()
                                         // ここで必要な処理を行います
                                     }
                                 ) { errorMessage ->
                                     // エラーが発生した場合の処理
                                     println("Request failed with exception: $errorMessage")
-                                    File(csvFilePath.value).delete()
+                                    //File(csvFilePath.value).delete()
                                     // ここでエラー処理を行います
                                 }
                             }

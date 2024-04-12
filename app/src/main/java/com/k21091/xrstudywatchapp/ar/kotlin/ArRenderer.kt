@@ -15,6 +15,9 @@
  */
 package com.k21091.xrstudywatchapp.ar.kotlin
 
+import DownloadImageTask
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.opengl.GLES30
 import android.opengl.Matrix
 import android.util.Log
@@ -28,7 +31,6 @@ import com.google.ar.core.InstantPlacementPoint
 import com.google.ar.core.LightEstimate
 import com.google.ar.core.Plane
 import com.google.ar.core.Point
-import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.Trackable
 import com.google.ar.core.TrackingFailureReason
@@ -49,542 +51,686 @@ import com.k21091.xrstudywatchapp.ar.samplerender.VertexBuffer
 import com.k21091.xrstudywatchapp.ar.samplerender.arcore.BackgroundRenderer
 import com.k21091.xrstudywatchapp.ar.samplerender.arcore.PlaneRenderer
 import com.k21091.xrstudywatchapp.ar.samplerender.arcore.SpecularCubemapFilter
-import com.k21091.xrstudywatchapp.util.doInBackground
+import com.k21091.xrstudywatchapp.util.ArrivingObject
+import com.k21091.xrstudywatchapp.util.spotObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.net.URL
 import java.nio.ByteBuffer
+import kotlin.math.log
 
 /** Renders the HelloAR application using our example Renderer. */
 class ArRenderer(val activity: MainActivity) :
-  SampleRender.Renderer, DefaultLifecycleObserver {
-  companion object {
-    val TAG = "HelloArRenderer"
+    SampleRender.Renderer, DefaultLifecycleObserver {
+    var objectChanged = false
 
-    // See the definition of updateSphericalHarmonicsCoefficients for an explanation of these
-    // constants.
-    private val sphericalHarmonicFactors =
-      floatArrayOf(
-        0.282095f,
-        -0.325735f,
-        0.325735f,
-        -0.325735f,
-        0.273137f,
-        -0.273137f,
-        0.078848f,
-        -0.273137f,
-        0.136569f
-      )
+    companion object {
+        val TAG = "HelloArRenderer"
 
-    private val Z_NEAR = 0.1f
-    private val Z_FAR = 100f
+        // See the definition of updateSphericalHarmonicsCoefficients for an explanation of these
+        // constants.
+        private val sphericalHarmonicFactors =
+            floatArrayOf(
+                0.282095f,
+                -0.325735f,
+                0.325735f,
+                -0.325735f,
+                0.273137f,
+                -0.273137f,
+                0.078848f,
+                -0.273137f,
+                0.136569f
+            )
 
-    // Assumed distance from the device camera to the surface on which user will try to place
-    // objects.
-    // This value affects the apparent scale of objects while the tracking method of the
-    // Instant Placement point is SCREENSPACE_WITH_APPROXIMATE_DISTANCE.
-    // Values in the [0.2, 2.0] meter range are a good choice for most AR experiences. Use lower
-    // values for AR experiences where users are expected to place objects on surfaces close to the
-    // camera. Use larger values for experiences where the user will likely be standing and trying
-    // to
-    // place an object on the ground or floor in front of them.
-    val APPROXIMATE_DISTANCE_METERS = 2.0f
+        private val Z_NEAR = 0.1f
+        private val Z_FAR = 100f
 
-    val CUBEMAP_RESOLUTION = 16
-    val CUBEMAP_NUMBER_OF_IMPORTANCE_SAMPLES = 32
-  }
+        // Assumed distance from the device camera to the surface on which user will try to place
+        // objects.
+        // This value affects the apparent scale of objects while the tracking method of the
+        // Instant Placement point is SCREENSPACE_WITH_APPROXIMATE_DISTANCE.
+        // Values in the [0.2, 2.0] meter range are a good choice for most AR experiences. Use lower
+        // values for AR experiences where users are expected to place objects on surfaces close to the
+        // camera. Use larger values for experiences where the user will likely be standing and trying
+        // to
+        // place an object on the ground or floor in front of them.
+        val APPROXIMATE_DISTANCE_METERS = 2.0f
 
-  lateinit var render: SampleRender
-  lateinit var planeRenderer: PlaneRenderer
-  lateinit var backgroundRenderer: BackgroundRenderer
-  lateinit var virtualSceneFramebuffer: Framebuffer
-  var hasSetTextureNames = false
-
-  // Point Cloud
-  lateinit var pointCloudVertexBuffer: VertexBuffer
-  lateinit var pointCloudMesh: Mesh
-  lateinit var pointCloudShader: Shader
-
-  // Keep track of the last point cloud rendered to avoid updating the VBO if point cloud
-  // was not changed.  Do this using the timestamp since we can't compare PointCloud objects.
-  var lastPointCloudTimestamp: Long = 0
-
-  // Virtual object (ARCore pawn)
-  lateinit var virtualObjectMesh: Mesh
-  lateinit var virtualObjectShader: Shader
-  lateinit var virtualObjectAlbedoTexture: Texture
-  lateinit var virtualObjectAlbedoInstantPlacementTexture: Texture
-
-  private val wrappedAnchors = mutableListOf<WrappedAnchor>()
-
-  // Environmental HDR
-  lateinit var dfgTexture: Texture
-  lateinit var cubemapFilter: SpecularCubemapFilter
-
-  // Temporary matrix allocated here to reduce number of allocations for each frame.
-  val modelMatrix = FloatArray(16)
-  val viewMatrix = FloatArray(16)
-  val projectionMatrix = FloatArray(16)
-  val modelViewMatrix = FloatArray(16) // view x model
-
-  val modelViewProjectionMatrix = FloatArray(16) // projection x view x model
-
-  val sphericalHarmonicsCoefficients = FloatArray(9 * 3)
-  val viewInverseMatrix = FloatArray(16)
-  val worldLightDirection = floatArrayOf(0.0f, 0.0f, 0.0f, 0.0f)
-  val viewLightDirection = FloatArray(4) // view x world light direction
-
-  val session
-    get() = activity.arCoreSessionHelper.session
-
-  val displayRotationHelper = DisplayRotationHelper(activity)
-  val trackingStateHelper = TrackingStateHelper(activity)
-
-  override fun onResume(owner: LifecycleOwner) {
-    displayRotationHelper.onResume()
-    hasSetTextureNames = false
-  }
-
-  override fun onPause(owner: LifecycleOwner) {
-    displayRotationHelper.onPause()
-  }
-
-  override fun onSurfaceCreated(render: SampleRender) {
-    // Prepare the rendering objects.
-    // This involves reading shaders and 3D model files, so may throw an IOException.
-    try {
-      planeRenderer = PlaneRenderer(render)
-      backgroundRenderer = BackgroundRenderer(render)
-      virtualSceneFramebuffer = Framebuffer(render, /*width=*/ 1, /*height=*/ 1)
-
-      cubemapFilter =
-        SpecularCubemapFilter(render, CUBEMAP_RESOLUTION, CUBEMAP_NUMBER_OF_IMPORTANCE_SAMPLES)
-      // Load environmental lighting values lookup table
-      dfgTexture =
-        Texture(
-          render,
-          Texture.Target.TEXTURE_2D,
-          Texture.WrapMode.CLAMP_TO_EDGE,
-          /*useMipmaps=*/ false
-        )
-      // The dfg.raw file is a raw half-float texture with two channels.
-      val dfgResolution = 64
-      val dfgChannels = 2
-      val halfFloatSize = 2
-
-      val buffer: ByteBuffer =
-        ByteBuffer.allocateDirect(dfgResolution * dfgResolution * dfgChannels * halfFloatSize)
-      activity.assets.open("models/dfg.raw").use { it.read(buffer.array()) }
-
-      // SampleRender abstraction leaks here.
-      GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, dfgTexture.textureId)
-      GLError.maybeThrowGLException("Failed to bind DFG texture", "glBindTexture")
-      GLES30.glTexImage2D(
-        GLES30.GL_TEXTURE_2D,
-        /*level=*/ 0,
-        GLES30.GL_RG16F,
-        /*width=*/ dfgResolution,
-        /*height=*/ dfgResolution,
-        /*border=*/ 0,
-        GLES30.GL_RG,
-        GLES30.GL_HALF_FLOAT,
-        buffer
-      )
-      GLError.maybeThrowGLException("Failed to populate DFG texture", "glTexImage2D")
-
-      // Point cloud
-      pointCloudShader =
-        Shader.createFromAssets(
-          render,
-          "shaders/point_cloud.vert",
-          "shaders/point_cloud.frag",
-          /*defines=*/ null
-        )
-          .setVec4("u_Color", floatArrayOf(31.0f / 255.0f, 188.0f / 255.0f, 210.0f / 255.0f, 1.0f))
-          .setFloat("u_PointSize", 5.0f)
-
-      // four entries per vertex: X, Y, Z, confidence
-      pointCloudVertexBuffer =
-        VertexBuffer(render, /*numberOfEntriesPerVertex=*/ 4, /*entries=*/ null)
-      val pointCloudVertexBuffers = arrayOf(pointCloudVertexBuffer)
-      pointCloudMesh =
-        Mesh(render, Mesh.PrimitiveMode.POINTS, /*indexBuffer=*/ null, pointCloudVertexBuffers)
-      val imageUrl = "https://pve01-storage-server.karasuneo.com/applications/01F8VYXK67BGC1F9RP1E4S9YTV/objects/01HTSFXDKKZ7TGPGWXGBDFG9Z6.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=4SVrbRAaIzNOThRz%2F20240406%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=20240406T104431Z&X-Amz-Expires=1200&X-Amz-Signature=90e8c43921b78940e597fc453a02def0ae22cb7d67ca3c9376266289cf9a6709&X-Amz-SignedHeaders=host&x-id=GetObject"
-      val bitmap=doInBackground(imageUrl)
-      // Virtual object to render (ARCore pawn)
-      virtualObjectAlbedoTexture =
-        Texture.createFromBitmap(
-          render,
-          bitmap,
-          Texture.WrapMode.CLAMP_TO_EDGE,
-          Texture.ColorFormat.SRGB,
-          2.0f,
-          1.0f
-        )
-
-      virtualObjectAlbedoInstantPlacementTexture =
-        Texture.createFromBitmap(
-          render,
-          bitmap,
-          Texture.WrapMode.CLAMP_TO_EDGE,
-          Texture.ColorFormat.LINEAR,
-          1.2f,
-          3.0f
-        )
-
-      val virtualObjectPbrTexture =
-        Texture.createFromBitmap(
-          render,
-          Texture.createWhiteBitmap(bitmap,1f,1f),
-          Texture.WrapMode.CLAMP_TO_EDGE,
-          Texture.ColorFormat.SRGB,
-          1f,
-          1f
-        )
-
-      if (bitmap != null) {
-        bitmap.recycle()
-      }
-      //virtualObjectMesh = Mesh.createFromAsset(render, "models/pawn.obj")
-
-      virtualObjectMesh = Mesh.createPlaneMeshFromBitmap(render, bitmap)
-      virtualObjectShader =
-        Shader.createFromAssets(
-          render,
-          "shaders/environmental_hdr.vert",
-          "shaders/environmental_hdr.frag",
-          mapOf("NUMBER_OF_MIPMAP_LEVELS" to cubemapFilter.numberOfMipmapLevels.toString())
-        )
-          .setTexture("u_AlbedoTexture", virtualObjectAlbedoTexture)
-          .setTexture("u_RoughnessMetallicAmbientOcclusionTexture", virtualObjectPbrTexture)
-          .setTexture("u_Cubemap", cubemapFilter.filteredCubemapTexture)
-          .setTexture("u_DfgTexture", dfgTexture)
-    } catch (e: IOException) {
-      Log.e(TAG, "Failed to read a required asset file", e)
-      showError("Failed to read a required asset file: $e")
-    }
-  }
-
-  override fun onSurfaceChanged(render: SampleRender, width: Int, height: Int) {
-    displayRotationHelper.onSurfaceChanged(width, height)
-    virtualSceneFramebuffer.resize(width, height)
-  }
-
-  override fun onDrawFrame(render: SampleRender) {
-    val session = session ?: return
-
-    // Texture names should only be set once on a GL thread unless they change. This is done during
-    // onDrawFrame rather than onSurfaceCreated since the session is not guaranteed to have been
-    // initialized during the execution of onSurfaceCreated.
-    if (!hasSetTextureNames) {
-      session.setCameraTextureNames(intArrayOf(backgroundRenderer.cameraColorTexture.textureId))
-      hasSetTextureNames = true
+        val CUBEMAP_RESOLUTION = 16
+        val CUBEMAP_NUMBER_OF_IMPORTANCE_SAMPLES = 32
     }
 
-    // -- Update per-frame state
+    lateinit var render: SampleRender
+    lateinit var planeRenderer: PlaneRenderer
+    lateinit var backgroundRenderer: BackgroundRenderer
+    lateinit var virtualSceneFramebuffer: Framebuffer
+    var hasSetTextureNames = false
 
-    // Notify ARCore session that the view size changed so that the perspective matrix and
-    // the video background can be properly adjusted.
-    displayRotationHelper.updateSessionIfNeeded(session)
+    // Point Cloud
+    lateinit var pointCloudVertexBuffer: VertexBuffer
+    lateinit var pointCloudMesh: Mesh
+    lateinit var pointCloudShader: Shader
 
-    // Obtain the current frame from ARSession. When the configuration is set to
-    // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
-    // camera framerate.
-    val frame =
-      try {
-        session.update()
-      } catch (e: CameraNotAvailableException) {
-        Log.e(TAG, "Camera not available during onDrawFrame", e)
-        showError("Camera not available. Try restarting the app.")
-        return
-      }
+    // Keep track of the last point cloud rendered to avoid updating the VBO if point cloud
+    // was not changed.  Do this using the timestamp since we can't compare PointCloud objects.
+    var lastPointCloudTimestamp: Long = 0
 
-    val camera = frame.camera
+    //Poster
+    var virtualPosterMeshList: MutableList<Mesh> = mutableListOf()
+    var virtualPosterShaderList: MutableList<Shader> = mutableListOf()
+    var virtualPosterAlbedoTextureList: MutableList<Texture> = mutableListOf()
+    var virtualPosterAlbedoInstantPlacementTextureList: MutableList<Texture> = mutableListOf()
+    var virtualPosterPbrTextureList: MutableList<Texture> = mutableListOf()
+    var count = 0
+    var tmp=false
 
-    // Update BackgroundRenderer state to match the depth settings.
-    try {
-      backgroundRenderer.setUseDepthVisualization(
-        render,
-        activity.depthSettings.depthColorVisualizationEnabled()
-      )
-      backgroundRenderer.setUseOcclusion(render, activity.depthSettings.useDepthForOcclusion())
-    } catch (e: IOException) {
-      Log.e(TAG, "Failed to read a required asset file", e)
-      showError("Failed to read a required asset file: $e")
-      return
+    private val wrappedAnchors = mutableListOf<WrappedAnchor>()
+
+    // Environmental HDR
+    lateinit var dfgTexture: Texture
+    lateinit var cubemapFilter: SpecularCubemapFilter
+
+    // Temporary matrix allocated here to reduce number of allocations for each frame.
+    val modelMatrix = FloatArray(16)
+    val viewMatrix = FloatArray(16)
+    val projectionMatrix = FloatArray(16)
+    val modelViewMatrix = FloatArray(16) // view x model
+
+    val modelViewProjectionMatrix = FloatArray(16) // projection x view x model
+
+    val sphericalHarmonicsCoefficients = FloatArray(9 * 3)
+    val viewInverseMatrix = FloatArray(16)
+    val worldLightDirection = floatArrayOf(0.0f, 0.0f, 0.0f, 0.0f)
+    val viewLightDirection = FloatArray(4) // view x world light direction
+
+    val session
+        get() = activity.arCoreSessionHelper.session
+
+    val displayRotationHelper = DisplayRotationHelper(activity)
+    val trackingStateHelper = TrackingStateHelper(activity)
+
+    override fun onResume(owner: LifecycleOwner) {
+        displayRotationHelper.onResume()
+        hasSetTextureNames = false
     }
 
-    // BackgroundRenderer.updateDisplayGeometry must be called every frame to update the coordinates
-    // used to draw the background camera image.
-    backgroundRenderer.updateDisplayGeometry(frame)
-    val shouldGetDepthImage =
-      activity.depthSettings.useDepthForOcclusion() ||
-              activity.depthSettings.depthColorVisualizationEnabled()
-    if (camera.trackingState == TrackingState.TRACKING && shouldGetDepthImage) {
-      try {
-        val depthImage = frame.acquireDepthImage16Bits()
-        backgroundRenderer.updateCameraDepthTexture(depthImage)
-        depthImage.close()
-      } catch (e: NotYetAvailableException) {
-        // This normally means that depth data is not available yet. This is normal so we will not
-        // spam the logcat with this.
-      }
+    override fun onPause(owner: LifecycleOwner) {
+        displayRotationHelper.onPause()
     }
 
-    // Handle one tap per frame.
-    handleTap(frame, camera)
-    //placeAnchorOnVerticalPlane(frame,camera)
+    override fun onSurfaceCreated(render: SampleRender) {
+        this.render = render // renderを初期化する
+        // Prepare the rendering objects.
+        // This involves reading shaders and 3D model files, so may throw an IOException.
+        try {
+            planeRenderer = PlaneRenderer(render)
+            backgroundRenderer = BackgroundRenderer(render)
+            virtualSceneFramebuffer = Framebuffer(render, /*width=*/ 1, /*height=*/ 1)
 
-    // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
-    trackingStateHelper.updateKeepScreenOnFlag(camera.trackingState)
+            cubemapFilter =
+                SpecularCubemapFilter(
+                    render,
+                    CUBEMAP_RESOLUTION,
+                    CUBEMAP_NUMBER_OF_IMPORTANCE_SAMPLES
+                )
+            // Load environmental lighting values lookup table
+            dfgTexture =
+                Texture(
+                    render,
+                    Texture.Target.TEXTURE_2D,
+                    Texture.WrapMode.CLAMP_TO_EDGE,
+                    /*useMipmaps=*/ false
+                )
+            // The dfg.raw file is a raw half-float texture with two channels.
+            val dfgResolution = 64
+            val dfgChannels = 2
+            val halfFloatSize = 2
 
-    // Show a message based on whether tracking has failed, if planes are detected, and if the user
-    // has placed any objects.
-    val message: String? =
-      when {
-        camera.trackingState == TrackingState.PAUSED &&
-                camera.trackingFailureReason == TrackingFailureReason.NONE ->
-          activity.getString(R.string.searching_planes)
-        camera.trackingState == TrackingState.PAUSED ->
-          TrackingStateHelper.getTrackingFailureReasonString(camera)
-        session.hasTrackingPlane() && wrappedAnchors.isEmpty() ->
-          activity.getString(R.string.waiting_taps)
-        session.hasTrackingPlane() && wrappedAnchors.isNotEmpty() -> null
-        else -> activity.getString(R.string.searching_planes)
-      }
-    if (message == null) {
-      activity.view.snackbarHelper.hide(activity)
-    } else {
-      activity.view.snackbarHelper.showMessage(activity, message)
+            val buffer: ByteBuffer =
+                ByteBuffer.allocateDirect(dfgResolution * dfgResolution * dfgChannels * halfFloatSize)
+            activity.assets.open("models/dfg.raw").use { it.read(buffer.array()) }
+
+            // SampleRender abstraction leaks here.
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, dfgTexture.textureId)
+            GLError.maybeThrowGLException("Failed to bind DFG texture", "glBindTexture")
+            GLES30.glTexImage2D(
+                GLES30.GL_TEXTURE_2D,
+                /*level=*/ 0,
+                GLES30.GL_RG16F,
+                /*width=*/ dfgResolution,
+                /*height=*/ dfgResolution,
+                /*border=*/ 0,
+                GLES30.GL_RG,
+                GLES30.GL_HALF_FLOAT,
+                buffer
+            )
+            GLError.maybeThrowGLException("Failed to populate DFG texture", "glTexImage2D")
+
+            // Point cloud
+            pointCloudShader =
+                Shader.createFromAssets(
+                    render,
+                    "shaders/point_cloud.vert",
+                    "shaders/point_cloud.frag",
+                    /*defines=*/ null
+                )
+                    .setVec4(
+                        "u_Color",
+                        floatArrayOf(31.0f / 255.0f, 188.0f / 255.0f, 210.0f / 255.0f, 1.0f)
+                    )
+                    .setFloat("u_PointSize", 5.0f)
+
+            // four entries per vertex: X, Y, Z, confidence
+            pointCloudVertexBuffer =
+                VertexBuffer(render, /*numberOfEntriesPerVertex=*/ 4, /*entries=*/ null)
+            val pointCloudVertexBuffers = arrayOf(pointCloudVertexBuffer)
+            pointCloudMesh =
+                Mesh(
+                    render,
+                    Mesh.PrimitiveMode.POINTS, /*indexBuffer=*/
+                    null,
+                    pointCloudVertexBuffers
+                )
+        } catch (e: IOException) {
+            Log.e(TAG, "Failed to read a required asset file", e)
+            showError("Failed to read a required asset file: $e")
+        }
     }
 
-    // -- Draw background
-    if (frame.timestamp != 0L) {
-      // Suppress rendering if the camera did not produce the first frame yet. This is to avoid
-      // drawing possible leftover data from previous sessions if the texture is reused.
-      backgroundRenderer.drawBackground(render)
+    override fun onSurfaceChanged(render: SampleRender, width: Int, height: Int) {
+        displayRotationHelper.onSurfaceChanged(width, height)
+        virtualSceneFramebuffer.resize(width, height)
     }
 
-    // If not tracking, don't draw 3D objects.
-    if (camera.trackingState == TrackingState.PAUSED) {
-      return
-    }
+    override fun onDrawFrame(render: SampleRender) {
+        val session = session ?: return
 
-    // -- Draw non-occluded virtual objects (planes, point cloud)
+        // Texture names should only be set once on a GL thread unless they change. This is done during
+        // onDrawFrame rather than onSurfaceCreated since the session is not guaranteed to have been
+        // initialized during the execution of onSurfaceCreated.
+        if (!hasSetTextureNames) {
+            session.setCameraTextureNames(intArrayOf(backgroundRenderer.cameraColorTexture.textureId))
+            hasSetTextureNames = true
+        }
 
-    // Get projection matrix.
-    camera.getProjectionMatrix(projectionMatrix, 0, Z_NEAR, Z_FAR)
+        if (spotObject.value.isNotEmpty()) {
+            if (tmp==false) {
+                createPoster(spotObject.value.toMutableMap())
+                println("objectcreste")
+                tmp=true
+            }
+            objectChanged = false
+        }
 
-    // Get camera matrix and draw.
-    camera.getViewMatrix(viewMatrix, 0)
-    frame.acquirePointCloud().use { pointCloud ->
-      if (pointCloud.timestamp > lastPointCloudTimestamp) {
-        pointCloudVertexBuffer.set(pointCloud.points)
-        lastPointCloudTimestamp = pointCloud.timestamp
-      }
-      Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
-      pointCloudShader.setMat4("u_ModelViewProjection", modelViewProjectionMatrix)
-      render.draw(pointCloudMesh, pointCloudShader)
-    }
+        // -- Update per-frame state
 
-    // Visualize planes.
-    planeRenderer.drawPlanes(
-      render,
-      session.getAllTrackables<Plane>(Plane::class.java),
-      camera.displayOrientedPose,
-      projectionMatrix
-    )
+        // Notify ARCore session that the view size changed so that the perspective matrix and
+        // the video background can be properly adjusted.
+        displayRotationHelper.updateSessionIfNeeded(session)
 
-    // -- Draw occluded virtual objects
+        // Obtain the current frame from ARSession. When the configuration is set to
+        // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
+        // camera framerate.
+        val frame =
+            try {
+                session.update()
+            } catch (e: CameraNotAvailableException) {
+                Log.e(TAG, "Camera not available during onDrawFrame", e)
+                showError("Camera not available. Try restarting the app.")
+                return
+            }
 
-    // Update lighting parameters in the shader
-    updateLightEstimation(frame.lightEstimate, viewMatrix)
+        val camera = frame.camera
 
-    // Visualize anchors created by touch.
-    render.clear(virtualSceneFramebuffer, 0f, 0f, 0f, 0f)
-    for ((anchor, trackable) in
-    wrappedAnchors.filter { it.anchor.trackingState == TrackingState.TRACKING }) {
-      // Get the current pose of an Anchor in world space. The Anchor pose is updated
-      // during calls to session.update() as ARCore refines its estimate of the world.
-      anchor.pose.toMatrix(modelMatrix, 0)
+        // Update BackgroundRenderer state to match the depth settings.
+        try {
+            backgroundRenderer.setUseDepthVisualization(
+                render,
+                activity.depthSettings.depthColorVisualizationEnabled()
+            )
+            backgroundRenderer.setUseOcclusion(
+                render,
+                activity.depthSettings.useDepthForOcclusion()
+            )
+        } catch (e: IOException) {
+            Log.e(TAG, "Failed to read a required asset file", e)
+            showError("Failed to read a required asset file: $e")
+            return
+        }
 
-      // Calculate model/view/projection matrices
-      Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
-      Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, modelViewMatrix, 0)
+        // BackgroundRenderer.updateDisplayGeometry must be called every frame to update the coordinates
+        // used to draw the background camera image.
+        backgroundRenderer.updateDisplayGeometry(frame)
+        val shouldGetDepthImage =
+            activity.depthSettings.useDepthForOcclusion() ||
+                    activity.depthSettings.depthColorVisualizationEnabled()
+        if (camera.trackingState == TrackingState.TRACKING && shouldGetDepthImage) {
+            try {
+                val depthImage = frame.acquireDepthImage16Bits()
+                backgroundRenderer.updateCameraDepthTexture(depthImage)
+                depthImage.close()
+            } catch (e: NotYetAvailableException) {
+                // This normally means that depth data is not available yet. This is normal so we will not
+                // spam the logcat with this.
+            }
+        }
 
-      // Update shader properties and draw
-      virtualObjectShader.setMat4("u_ModelView", modelViewMatrix)
-      virtualObjectShader.setMat4("u_ModelViewProjection", modelViewProjectionMatrix)
-      val texture =
-        if ((trackable as? InstantPlacementPoint)?.trackingMethod ==
-          InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE
-        ) {
-          virtualObjectAlbedoInstantPlacementTexture
+        // Handle one tap per frame.
+        //if (wrappedAnchors.isEmpty()&&virtualPosterMeshList.isNotEmpty()) {
+            handleTap(frame, camera)
+        //}
+        //placeAnchorOnVerticalPlane(frame,camera)
+
+        // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
+        trackingStateHelper.updateKeepScreenOnFlag(camera.trackingState)
+
+        // Show a message based on whether tracking has failed, if planes are detected, and if the user
+        // has placed any objects.
+        val message: String? =
+            when {
+                camera.trackingState == TrackingState.PAUSED &&
+                        camera.trackingFailureReason == TrackingFailureReason.NONE ->
+                    activity.getString(R.string.searching_planes)
+
+                camera.trackingState == TrackingState.PAUSED ->
+                    TrackingStateHelper.getTrackingFailureReasonString(camera)
+
+                session.hasTrackingPlane() && wrappedAnchors.isEmpty() ->
+                    activity.getString(R.string.waiting_taps)
+
+                session.hasTrackingPlane() && wrappedAnchors.isNotEmpty() -> null
+                else -> activity.getString(R.string.searching_planes)
+            }
+        if (message == null) {
+            activity.view.snackbarHelper.hide(activity)
         } else {
-          virtualObjectAlbedoTexture
+            activity.view.snackbarHelper.showMessage(activity, message)
         }
-      virtualObjectShader.setTexture("u_AlbedoTexture", texture)
-      render.draw(virtualObjectMesh, virtualObjectShader, virtualSceneFramebuffer)
-    }
 
-    // Compose the virtual scene with the background.
-    backgroundRenderer.drawVirtualScene(render, virtualSceneFramebuffer, Z_NEAR, Z_FAR)
-  }
-
-  /** Checks if we detected at least one plane. */
-  private fun Session.hasTrackingPlane() =
-    getAllTrackables(Plane::class.java).any { it.trackingState == TrackingState.TRACKING }
-
-  /** Update state based on the current frame's light estimation. */
-  private fun updateLightEstimation(lightEstimate: LightEstimate, viewMatrix: FloatArray) {
-    if (lightEstimate.state != LightEstimate.State.VALID) {
-      virtualObjectShader.setBool("u_LightEstimateIsValid", false)
-      return
-    }
-    virtualObjectShader.setBool("u_LightEstimateIsValid", true)
-    Matrix.invertM(viewInverseMatrix, 0, viewMatrix, 0)
-    virtualObjectShader.setMat4("u_ViewInverse", viewInverseMatrix)
-    updateMainLight(
-      lightEstimate.environmentalHdrMainLightDirection,
-      lightEstimate.environmentalHdrMainLightIntensity,
-      viewMatrix
-    )
-    updateSphericalHarmonicsCoefficients(lightEstimate.environmentalHdrAmbientSphericalHarmonics)
-    cubemapFilter.update(lightEstimate.acquireEnvironmentalHdrCubeMap())
-  }
-
-  private fun updateMainLight(
-    direction: FloatArray,
-    intensity: FloatArray,
-    viewMatrix: FloatArray
-  ) {
-    // We need the direction in a vec4 with 0.0 as the final component to transform it to view space
-    worldLightDirection[0] = direction[0]
-    worldLightDirection[1] = direction[1]
-    worldLightDirection[2] = direction[2]
-    Matrix.multiplyMV(viewLightDirection, 0, viewMatrix, 0, worldLightDirection, 0)
-    virtualObjectShader.setVec4("u_ViewLightDirection", viewLightDirection)
-    virtualObjectShader.setVec3("u_LightIntensity", intensity)
-  }
-
-  private fun updateSphericalHarmonicsCoefficients(coefficients: FloatArray) {
-    // Pre-multiply the spherical harmonics coefficients before passing them to the shader. The
-    // constants in sphericalHarmonicFactors were derived from three terms:
-    //
-    // 1. The normalized spherical harmonics basis functions (y_lm)
-    //
-    // 2. The lambertian diffuse BRDF factor (1/pi)
-    //
-    // 3. A <cos> convolution. This is done to so that the resulting function outputs the irradiance
-    // of all incoming light over a hemisphere for a given surface normal, which is what the shader
-    // (environmental_hdr.frag) expects.
-    //
-    // You can read more details about the math here:
-    // https://google.github.io/filament/Filament.html#annex/sphericalharmonics
-    require(coefficients.size == 9 * 3) {
-      "The given coefficients array must be of length 27 (3 components per 9 coefficients"
-    }
-
-    // Apply each factor to every component of each coefficient
-    for (i in 0 until 9 * 3) {
-      sphericalHarmonicsCoefficients[i] = coefficients[i] * sphericalHarmonicFactors[i / 3]
-    }
-    virtualObjectShader.setVec3Array(
-      "u_SphericalHarmonicsCoefficients",
-      sphericalHarmonicsCoefficients
-    )
-  }
-
-  // Handle only one tap per frame, as taps are usually low frequency compared to frame rate.
-  private fun handleTap(frame: Frame, camera: Camera) {
-    if (camera.trackingState != TrackingState.TRACKING) return
-    val tap = activity.view.tapHelper.poll() ?: return
-
-    val hitResultList =
-      if (activity.instantPlacementSettings.isInstantPlacementEnabled) {
-        frame.hitTestInstantPlacement(tap.x, tap.y, APPROXIMATE_DISTANCE_METERS)
-      } else {
-        frame.hitTest(tap)
-      }
-
-    // Hits are sorted by depth. Consider only closest hit on a plane, Oriented Point, Depth Point,
-    // or Instant Placement Point.
-    val firstHitResult =
-      hitResultList.firstOrNull { hit ->
-        when (val trackable = hit.trackable!!) {
-          is Plane ->
-            trackable.isPoseInPolygon(hit.hitPose) &&
-                    PlaneRenderer.calculateDistanceToPlane(hit.hitPose, camera.pose) > 0
-          is Point -> trackable.orientationMode == Point.OrientationMode.ESTIMATED_SURFACE_NORMAL
-          is InstantPlacementPoint -> true
-          // DepthPoints are only returned if Config.DepthMode is set to AUTOMATIC.
-          is DepthPoint -> true
-          else -> false
+        // -- Draw background
+        if (frame.timestamp != 0L) {
+            // Suppress rendering if the camera did not produce the first frame yet. This is to avoid
+            // drawing possible leftover data from previous sessions if the texture is reused.
+            backgroundRenderer.drawBackground(render)
         }
-      }
 
-    if (firstHitResult != null) {
-      // Cap the number of objects created. This avoids overloading both the
-      // rendering system and ARCore.
-      if (wrappedAnchors.size >= 20) {
-        wrappedAnchors[0].anchor.detach()
-        wrappedAnchors.removeAt(0)
-      }
-
-      // Adding an Anchor tells ARCore that it should track this position in
-      // space. This anchor is created on the Plane to place the 3D model
-      // in the correct position relative both to the world and to the plane.
-      wrappedAnchors.add(WrappedAnchor(firstHitResult.createAnchor(), firstHitResult.trackable))
-
-      // For devices that support the Depth API, shows a dialog to suggest enabling
-      // depth-based occlusion. This dialog needs to be spawned on the UI thread.
-      activity.runOnUiThread { activity.view.showOcclusionDialogIfNeeded() }
-    }
-  }
-
-
-
-
-  private var isAnchorPlaced = false // アンカーが設置されたかどうかを示すフラグ
-
-  private fun placeAnchorOnVerticalPlane(frame: Frame, camera: Camera) {
-    if (camera.trackingState != TrackingState.TRACKING || isAnchorPlaced) return
-
-    // 垂直な平面を検出する
-    val verticalPlane = frame.getUpdatedTrackables(Plane::class.java)
-      .firstOrNull { plane ->
-        // 平面の法線ベクトルを取得
-        val planeNormal = plane.centerPose.zAxis
-        // 法線ベクトルのY成分を取得
-        val planeNormalY = planeNormal[1] // Y成分はインデックス1にある
-        // 法線ベクトルのY成分が上向きまたは下向きであるかを確認
-        val isVertical = planeNormalY > 0.9 || planeNormalY < -0.9
-        // 垂直な平面かどうかを返す
-        isVertical
-      }
-
-
-    if (verticalPlane != null) {
-      val centerPose = verticalPlane!!.centerPose
-      // アンカーを設置する
-      val hitTestResult = frame.hitTestInstantPlacement(centerPose.tx(), centerPose.ty(), APPROXIMATE_DISTANCE_METERS)
-        .firstOrNull()
-      if (hitTestResult != null) {
-        // アンカーを設置
-        val anchor = hitTestResult.createAnchor()
-        // アンカーをリストに追加
-        wrappedAnchors.add(WrappedAnchor(anchor, verticalPlane))
-        // アンカーが設置されたことを記録
-        isAnchorPlaced = true
-        // 必要な場合はUIスレッド上で処理を行う
-        activity.runOnUiThread {
-          activity.view.showOcclusionDialogIfNeeded()
+        // If not tracking, don't draw 3D objects.
+        if (camera.trackingState == TrackingState.PAUSED) {
+            return
         }
-      }
+
+        // -- Draw non-occluded virtual objects (planes, point cloud)
+
+        // Get projection matrix.
+        camera.getProjectionMatrix(projectionMatrix, 0, Z_NEAR, Z_FAR)
+
+        // Get camera matrix and draw.
+        camera.getViewMatrix(viewMatrix, 0)
+        frame.acquirePointCloud().use { pointCloud ->
+            if (pointCloud.timestamp > lastPointCloudTimestamp) {
+                pointCloudVertexBuffer.set(pointCloud.points)
+                lastPointCloudTimestamp = pointCloud.timestamp
+            }
+            Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
+            pointCloudShader.setMat4("u_ModelViewProjection", modelViewProjectionMatrix)
+            render.draw(pointCloudMesh, pointCloudShader)
+        }
+
+        // Visualize planes.
+        planeRenderer.drawPlanes(
+            render,
+            session.getAllTrackables<Plane>(Plane::class.java),
+            camera.displayOrientedPose,
+            projectionMatrix
+        )
+
+        // -- Draw occluded virtual objects
+
+        // Update lighting parameters in the shader
+        updateLightEstimation(frame.lightEstimate, viewMatrix)
+
+        // Visualize anchors created by touch.
+        render.clear(virtualSceneFramebuffer, 0f, 0f, 0f, 0f)
+        drawPosters(wrappedAnchors)
+
+        // Compose the virtual scene with the background.
+        backgroundRenderer.drawVirtualScene(render, virtualSceneFramebuffer, Z_NEAR, Z_FAR)
     }
-  }
+
+    /** Checks if we detected at least one plane. */
+    private fun Session.hasTrackingPlane() =
+        getAllTrackables(Plane::class.java).any { it.trackingState == TrackingState.TRACKING }
+
+    /** Update state based on the current frame's light estimation. */
+    private fun updateLightEstimation(lightEstimate: LightEstimate, viewMatrix: FloatArray) {
+        if (lightEstimate.state != LightEstimate.State.VALID) {
+            //virtualPosterShaderList[0].setBool("u_LightEstimateIsValid", false)
+            return
+        }
+        //virtualPosterShaderList[0].setBool("u_LightEstimateIsValid", true)
+        Matrix.invertM(viewInverseMatrix, 0, viewMatrix, 0)
+        //virtualPosterShaderList[0].setMat4("u_ViewInverse", viewInverseMatrix)
+        updateMainLight(
+            lightEstimate.environmentalHdrMainLightDirection,
+            lightEstimate.environmentalHdrMainLightIntensity,
+            viewMatrix
+        )
+        updateSphericalHarmonicsCoefficients(lightEstimate.environmentalHdrAmbientSphericalHarmonics)
+        cubemapFilter.update(lightEstimate.acquireEnvironmentalHdrCubeMap())
+    }
+
+    private fun updateMainLight(
+        direction: FloatArray,
+        intensity: FloatArray,
+        viewMatrix: FloatArray
+    ) {
+        // We need the direction in a vec4 with 0.0 as the final component to transform it to view space
+        worldLightDirection[0] = direction[0]
+        worldLightDirection[1] = direction[1]
+        worldLightDirection[2] = direction[2]
+        Matrix.multiplyMV(viewLightDirection, 0, viewMatrix, 0, worldLightDirection, 0)
+        //virtualPosterShaderList[0].setVec4("u_ViewLightDirection", viewLightDirection)
+        //virtualPosterShaderList[0].setVec3("u_LightIntensity", intensity)
+    }
+
+    private fun updateSphericalHarmonicsCoefficients(coefficients: FloatArray) {
+        // Pre-multiply the spherical harmonics coefficients before passing them to the shader. The
+        // constants in sphericalHarmonicFactors were derived from three terms:
+        //
+        // 1. The normalized spherical harmonics basis functions (y_lm)
+        //
+        // 2. The lambertian diffuse BRDF factor (1/pi)
+        //
+        // 3. A <cos> convolution. This is done to so that the resulting function outputs the irradiance
+        // of all incoming light over a hemisphere for a given surface normal, which is what the shader
+        // (environmental_hdr.frag) expects.
+        //
+        // You can read more details about the math here:
+        // https://google.github.io/filament/Filament.html#annex/sphericalharmonics
+        require(coefficients.size == 9 * 3) {
+            "The given coefficients array must be of length 27 (3 components per 9 coefficients"
+        }
+
+        // Apply each factor to every component of each coefficient
+        for (i in 0 until 9 * 3) {
+            sphericalHarmonicsCoefficients[i] = coefficients[i] * sphericalHarmonicFactors[i / 3]
+        }
+//    virtualPosterShaderList[0].setVec3Array(
+//      "u_SphericalHarmonicsCoefficients",
+//      sphericalHarmonicsCoefficients
+//    )
+    }
+
+    // Handle only one tap per frame, as taps are usually low frequency compared to frame rate.
+    private fun handleTap(frame: Frame, camera: Camera) {
+        if (camera.trackingState != TrackingState.TRACKING) return
+        val tap = activity.view.tapHelper.poll() ?: return
+
+        val hitResultList =
+            if (activity.instantPlacementSettings.isInstantPlacementEnabled) {
+                frame.hitTestInstantPlacement(tap.x, tap.y, APPROXIMATE_DISTANCE_METERS)
+            } else {
+                frame.hitTest(tap)
+            }
+        Log.d("HitTest", "Hit test executed, hitResultList size: ${hitResultList.size}")
+        // Hits are sorted by depth. Consider only closest hit on a plane, Oriented Point, Depth Point,
+        // or Instant Placement Point.
+        val firstHitResult =
+            hitResultList.firstOrNull { hit ->
+                when (val trackable = hit.trackable!!) {
+                    is Plane ->
+                        trackable.isPoseInPolygon(hit.hitPose) &&
+                                PlaneRenderer.calculateDistanceToPlane(hit.hitPose, camera.pose) > 0
+
+                    is Point -> trackable.orientationMode == Point.OrientationMode.ESTIMATED_SURFACE_NORMAL
+                    is InstantPlacementPoint -> true
+                    // DepthPoints are only returned if Config.DepthMode is set to AUTOMATIC.
+                    is DepthPoint -> true
+                    else -> false
+                }
+            }
+// ヒットテストの結果をログに出力
+        for (hitResult in hitResultList) {
+            Log.d(
+                "HitTestResult",
+                "Hit pose: ${hitResult.hitPose}, Trackable: ${hitResult.trackable}"
+            )
+        }
+
+        if (firstHitResult != null) {
+            // Cap the number of objects created. This avoids overloading both the
+            // rendering system and ARCore.
+            if (wrappedAnchors.size >= 20) {
+                wrappedAnchors[0].anchor.detach()
+                wrappedAnchors.removeAt(0)
+            }
+
+            // Adding an Anchor tells ARCore that it should track this position in
+            // space. This anchor is created on the Plane to place the 3D model
+            // in the correct position relative both to the world and to the plane.
+
+            if (virtualPosterMeshList.size > wrappedAnchors.size) {
+                Log.d("ar", "createAnchor")
+                wrappedAnchors.add(
+                    WrappedAnchor(
+                        firstHitResult.createAnchor(),
+                        firstHitResult.trackable
+                    )
+                )
+
+            }
+            // For devices that support the Depth API, shows a dialog to suggest enabling
+            // depth-based occlusion. This dialog needs to be spawned on the UI thread.
+            activity.runOnUiThread { activity.view.showOcclusionDialogIfNeeded() }
+        }
+    }
 
 
-  private fun showError(errorMessage: String) =
-    activity.view.snackbarHelper.showError(activity, errorMessage)
+    private var isAnchorPlaced = false // アンカーが設置されたかどうかを示すフラグ
+
+    private fun placeAnchorOnVerticalPlane(frame: Frame, camera: Camera) {
+        if (camera.trackingState != TrackingState.TRACKING || isAnchorPlaced) return
+
+        // 垂直な平面を検出する
+        val verticalPlane = frame.getUpdatedTrackables(Plane::class.java)
+            .firstOrNull { plane ->
+                // 平面の法線ベクトルを取得
+                val planeNormal = plane.centerPose.zAxis
+                // 法線ベクトルのY成分を取得
+                val planeNormalY = planeNormal[1] // Y成分はインデックス1にある
+                // 法線ベクトルのY成分が上向きまたは下向きであるかを確認
+                val isVertical = planeNormalY > 0.9 || planeNormalY < -0.9
+                // 垂直な平面かどうかを返す
+                isVertical
+            }
+
+
+        if (verticalPlane != null) {
+            val centerPose = verticalPlane!!.centerPose
+            // アンカーを設置する
+            val hitTestResult = frame.hitTestInstantPlacement(
+                centerPose.tx(),
+                centerPose.ty(),
+                APPROXIMATE_DISTANCE_METERS
+            )
+                .firstOrNull()
+            if (hitTestResult != null) {
+                // アンカーを設置
+                val anchor = hitTestResult.createAnchor()
+                // アンカーをリストに追加
+                wrappedAnchors.add(WrappedAnchor(anchor, verticalPlane))
+                // アンカーが設置されたことを記録
+                isAnchorPlaced = true
+                // 必要な場合はUIスレッド上で処理を行う
+                activity.runOnUiThread {
+                    activity.view.showOcclusionDialogIfNeeded()
+                }
+            }
+        }
+    }
+
+
+    private fun showError(errorMessage: String) =
+        activity.view.snackbarHelper.showError(activity, errorMessage)
+
+
+
+    // Coroutineを使用して非同期で画像をダウンロードする関数
+    suspend fun downloadImageAsync(url: String): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = URL(url).openStream()
+            BitmapFactory.decodeStream(inputStream)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+    fun createPoster(spotMaps: MutableMap<String, ArrivingObject>) {
+//        virtualPosterMeshList.clear()
+//        virtualPosterShaderList.clear()
+//        virtualPosterAlbedoTextureList.clear()
+//        virtualPosterAlbedoInstantPlacementTextureList.clear()
+//        virtualPosterPbrTextureList.clear()
+//        wrappedAnchors.clear()
+        count = 0
+
+        runBlocking {
+            spotMaps.values.forEach { spotmap ->
+                println(spotmap.viewUrl)
+                val downloadedBitmap = async {
+                    downloadImageAsync(spotmap.viewUrl)
+                }.await()
+
+                if (downloadedBitmap != null) {
+                    // 画像のダウンロードが成功した場合の処理
+                    println("Poster:$count")
+                    val virtualPosterAlbedoTexture =
+                        Texture.createFromBitmap(
+                            render,
+                            downloadedBitmap,
+                            Texture.WrapMode.CLAMP_TO_EDGE,
+                            Texture.ColorFormat.SRGB,
+                            2.0f,
+                            1.0f
+                        )
+
+                    virtualPosterAlbedoTextureList.add(
+                        virtualPosterAlbedoTexture
+                    )
+
+                    virtualPosterAlbedoInstantPlacementTextureList.add(
+                        Texture.createFromBitmap(
+                            render,
+                            downloadedBitmap,
+                            Texture.WrapMode.CLAMP_TO_EDGE,
+                            Texture.ColorFormat.LINEAR,
+                            1.2f,
+                            3.0f
+                        )
+                    )
+
+                    val virtualPosterPbrTexture =
+                        Texture.createFromBitmap(
+                            render,
+                            Texture.createWhiteBitmap(downloadedBitmap, 1f, 1f),
+                            Texture.WrapMode.CLAMP_TO_EDGE,
+                            Texture.ColorFormat.SRGB,
+                            1f,
+                            1f
+                        )
+
+                    virtualPosterPbrTextureList.add(
+                        virtualPosterPbrTexture
+                    )
+
+                    virtualPosterMeshList.add(Mesh.createPlaneMeshFromImage(render, spotmap))
+
+                    virtualPosterShaderList.add(
+                        Shader.createFromAssets(
+                            render,
+                            "shaders/environmental_hdr.vert",
+                            "shaders/environmental_hdr.frag",
+                            mapOf("NUMBER_OF_MIPMAP_LEVELS" to cubemapFilter.numberOfMipmapLevels.toString())
+                        )
+                            .setTexture("u_AlbedoTexture", virtualPosterAlbedoTexture)
+                            .setTexture(
+                                "u_RoughnessMetallicAmbientOcclusionTexture",
+                                virtualPosterPbrTexture
+                            )
+                            .setTexture("u_Cubemap", cubemapFilter.filteredCubemapTexture)
+                            .setTexture("u_DfgTexture", dfgTexture)
+                    )
+
+                    downloadedBitmap.recycle()
+                } else {
+                    // 画像のダウンロードに失敗した場合の処理
+                    Log.e("getbitmap", "getbitmapfall")
+                }
+                count++
+            }
+        }
+    }
+
+    fun drawPosters(wrappedAnchors: List<WrappedAnchor>) {
+        // シェーダーリスト、テクスチャリスト、メッシュリストが空の場合は処理をスキップする
+        if (virtualPosterShaderList.isEmpty() || virtualPosterAlbedoTextureList.isEmpty() || virtualPosterMeshList.isEmpty()) {
+            //Log.d("tex","noTexture")
+            return
+        }
+
+        // wrappedAnchorsリストが空の場合も処理をスキップする
+        if (wrappedAnchors.isEmpty()) {
+            return
+        }
+
+        // 以下の処理はvirtualPosterShaderList、virtualPosterAlbedoTextureList、virtualPosterMeshListが空でなく、wrappedAnchorsリストが空でない場合のみ実行される
+        // 各アンカーごとにポスターを描画
+        wrappedAnchors.forEach { wrappedAnchor ->
+            val anchor = wrappedAnchor.anchor
+            val trackable = wrappedAnchor.trackable
+
+            if (anchor.trackingState == TrackingState.TRACKING) {
+                // アンカーの姿勢を取得
+                val anchorPose = anchor.pose
+
+                // アンカーの姿勢をモデル行列に変換
+                val modelMatrix = FloatArray(16)
+                anchorPose.toMatrix(modelMatrix, 0)
+
+                // モデルビュー行列とモデルビュープロジェクション行列を計算
+                val modelViewMatrix = FloatArray(16)
+                val modelViewProjectionMatrix = FloatArray(16)
+                Matrix.multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
+                Matrix.multiplyMM(
+                    modelViewProjectionMatrix,
+                    0,
+                    projectionMatrix,
+                    0,
+                    modelViewMatrix,
+                    0
+                )
+
+                // シェーダーの設定
+                val shader = virtualPosterShaderList[wrappedAnchors.indexOf(wrappedAnchor)]
+                shader.setMat4("u_ModelView", modelViewMatrix)
+                shader.setMat4("u_ModelViewProjection", modelViewProjectionMatrix)
+
+                // テクスチャの設定
+                val albedoTexture =
+                    virtualPosterAlbedoTextureList[wrappedAnchors.indexOf(wrappedAnchor)]
+                shader.setTexture("u_AlbedoTexture", albedoTexture)
+
+                // メッシュの描画
+                val mesh = virtualPosterMeshList[wrappedAnchors.indexOf(wrappedAnchor)]
+                render.draw(mesh, shader, virtualSceneFramebuffer)
+            }
+        }
+    }
+
+
 }
 
 /**
@@ -592,6 +738,6 @@ class ArRenderer(val activity: MainActivity) :
  * whether or not an Anchor originally was attached to an {@link InstantPlacementPoint}.
  */
 data class WrappedAnchor(
-  val anchor: Anchor,
-  val trackable: Trackable,
+    val anchor: Anchor,
+    val trackable: Trackable,
 )

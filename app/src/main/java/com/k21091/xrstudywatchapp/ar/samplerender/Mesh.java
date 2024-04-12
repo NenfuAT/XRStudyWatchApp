@@ -15,9 +15,13 @@
  */
 package com.k21091.xrstudywatchapp.ar.samplerender;
 
+import static java.lang.Float.parseFloat;
+
 import android.graphics.Bitmap;
 import android.opengl.GLES30;
 import android.util.Log;
+
+import com.k21091.xrstudywatchapp.util.ArrivingObject;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -156,28 +160,26 @@ public class Mesh implements Closeable {
   }
 
 
-  public static Mesh createPlaneMeshFromBitmap(SampleRender render, Bitmap bitmap) {
-    // Get bitmap dimensions
-    int width = bitmap.getWidth();
-    int height = bitmap.getHeight();
+  public static Mesh createPlaneMeshFromImage(SampleRender render, ArrivingObject object) {
 
-    float scaledWidth = width * 0.0005f;
-    float scaledHeight = height * 0.0005f;
 
+    float scaledWidth = 1.1f * parseFloat(object.getWidth());
+    float scaledHeight = 1.1f *  parseFloat(object.getHeight());
+    float floorHeight = scaledHeight;
     // Define vertex positions
     float[] vertices = {
-            -scaledWidth / 2, scaledHeight / 2, 0.0f, // Top left
-            -scaledWidth / 2, -scaledHeight / 2, 0.0f, // Bottom left
-            scaledWidth / 2, scaledHeight / 2, 0.0f, // Top right
-            scaledWidth / 2, -scaledHeight / 2, 0.0f // Bottom right
+            -scaledWidth / 2, scaledHeight / 2+ floorHeight, 0.0f, // Top left
+            -scaledWidth / 2, -scaledHeight / 2+ floorHeight, 0.0f, // Bottom left
+            scaledWidth / 2, scaledHeight / 2+ floorHeight, 0.0f, // Top right
+            scaledWidth / 2, -scaledHeight / 2+ floorHeight, 0.0f // Bottom right
     };
 
     // Define texture coordinates
     float[] texCoords = {
-            0.0f, 0.0f, // Top left
-            0.0f, 1.0f, // Bottom left
-            1.0f, 0.0f, // Top right
-            1.0f, 1.0f // Bottom right
+            0.0f, 1.0f, // Top left
+            0.0f, 0.0f, // Bottom left
+            1.0f, 1.0f, // Top right
+            1.0f, 0.0f // Bottom right
     };
 
     // Define indices
