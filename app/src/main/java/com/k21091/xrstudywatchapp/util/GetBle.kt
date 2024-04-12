@@ -1,9 +1,13 @@
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Handler
+import android.os.ParcelUuid
 import android.util.Log
 
 class GetBLE{
@@ -11,23 +15,30 @@ class GetBLE{
     private val bluetoothLeScanner: BluetoothLeScanner? = bluetoothAdapter?.bluetoothLeScanner
     private val handler = Handler()
 
-    private val SCAN_PERIOD: Long = 5000
+    var blestop = false
+
+    private val SCAN_PERIOD: Long = 1500
     private var results = mutableListOf<String>()
     private var scanCallback: ScanCallback? = null
 
-    fun startScan(count:Int,callback: (List<String>) -> Unit) {
+    @SuppressLint("MissingPermission")
+    fun startScan(count:Int, callback: (List<String>) -> Unit) {
         bluetoothLeScanner?.let { scanner ->
+            if (blestop){
+                bluetoothLeScanner.stopScan(scanCallback) // 修正
+                return
+            }
             if (scanCallback == null) {
                 results.clear() // スキャンが開始される前に結果をクリア
                 scanCallback = object : ScanCallback() {
                     override fun onScanResult(callbackType: Int, result: ScanResult) {
                         super.onScanResult(callbackType, result)
-                        val uuids = result.scanRecord?.serviceUuids
+                        val device = result.device
+                        val macAddress = device.address // MAC アドレスを取得
+
                         val receiveRssi = result.rssi
-                        uuids?.forEach { uuid ->
-                            val uuidString = uuid.uuid.toString()
-                            results.add("$count,$uuidString,$receiveRssi")
-                        }
+
+                        results.add("$count,$receiveRssi,$macAddress,ble")
                     }
 
                     override fun onScanFailed(errorCode: Int) {
@@ -47,10 +58,17 @@ class GetBLE{
         }
     }
 
-    private fun stopScan() {
+
+    @SuppressLint("MissingPermission")
+    fun stopScan() {
         scanCallback?.let { bluetoothLeScanner?.stopScan(it) }
         scanCallback = null
         Log.d("GetBLE", "Batch scan stopped")
     }
-}
 
+    fun BLEfin(){
+        blestop=true
+    }
+
+
+}

@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import com.k21091.xrstudywatchapp.util.OtherFileStorage
@@ -14,6 +16,22 @@ class GetWiFi(private val context: Context) {
         context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     }
 
+    fun startScanWithInterval(context: Context) {
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val handler = Handler(Looper.getMainLooper())
+
+        val SCAN_INTERVAL_MS = 5 * 1000 // 10 seconds
+
+        val scanTask = object : Runnable {
+            override fun run() {
+                wifiManager.startScan()
+                handler.postDelayed(this, SCAN_INTERVAL_MS.toLong())
+            }
+        }
+
+        // 最初のスキャンを即座に実行する
+        scanTask.run()
+    }
     fun getScanResult(){
         if (ActivityCompat.checkSelfPermission(
                 context,
@@ -43,7 +61,6 @@ class GetWiFi(private val context: Context) {
     }
 
     private fun processScanResults(results: List<ScanResult>) {
-        val OtherFileStorage= OtherFileStorage(context,"wifi")
         for (result in results) {
             val bssid = result.BSSID
             val level = result.level
@@ -52,6 +69,9 @@ class GetWiFi(private val context: Context) {
     }
     @SuppressLint("MissingPermission")
     fun getResults(): List<ScanResult> {
+        // スキャンを実行して結果を取得する
+        performWiFiScan()
+        // 最新のスキャン結果を返す
         return wifiManager.scanResults.toList()
     }
     companion object {

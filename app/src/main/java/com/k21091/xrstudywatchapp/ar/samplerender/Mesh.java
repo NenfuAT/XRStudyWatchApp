@@ -15,14 +15,22 @@
  */
 package com.k21091.xrstudywatchapp.ar.samplerender;
 
+import static java.lang.Float.parseFloat;
+
+import android.graphics.Bitmap;
 import android.opengl.GLES30;
 import android.util.Log;
+
+import com.k21091.xrstudywatchapp.util.ArrivingObject;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 
 import de.javagl.obj.Obj;
 import de.javagl.obj.ObjData;
@@ -150,6 +158,63 @@ public class Mesh implements Closeable {
       return new Mesh(render, PrimitiveMode.TRIANGLES, indexBuffer, vertexBuffers);
     }
   }
+
+
+  public static Mesh createPlaneMeshFromImage(SampleRender render, ArrivingObject object) {
+
+
+    float scaledWidth = 1.1f * parseFloat(object.getWidth());
+    float scaledHeight = 1.1f *  parseFloat(object.getHeight());
+    float floorHeight = scaledHeight;
+    // Define vertex positions
+    float[] vertices = {
+            -scaledWidth / 2, scaledHeight / 2+ floorHeight, 0.0f, // Top left
+            -scaledWidth / 2, -scaledHeight / 2+ floorHeight, 0.0f, // Bottom left
+            scaledWidth / 2, scaledHeight / 2+ floorHeight, 0.0f, // Top right
+            scaledWidth / 2, -scaledHeight / 2+ floorHeight, 0.0f // Bottom right
+    };
+
+    // Define texture coordinates
+    float[] texCoords = {
+            0.0f, 1.0f, // Top left
+            0.0f, 0.0f, // Bottom left
+            1.0f, 1.0f, // Top right
+            1.0f, 0.0f // Bottom right
+    };
+
+    // Define indices
+    int[] indices = {
+            0, 1, 2, // Triangle 1
+            2, 1, 3 // Triangle 2
+    };
+
+    // Create buffers for vertices, texture coordinates, and indices
+    FloatBuffer vertexBuffer = ByteBuffer.allocateDirect(vertices.length * 4)
+            .order(ByteOrder.nativeOrder()).asFloatBuffer();
+    vertexBuffer.put(vertices).position(0);
+
+    FloatBuffer texCoordBuffer = ByteBuffer.allocateDirect(texCoords.length * 4)
+            .order(ByteOrder.nativeOrder()).asFloatBuffer();
+    texCoordBuffer.put(texCoords).position(0);
+
+    IntBuffer indexBuffer = ByteBuffer.allocateDirect(indices.length * 4)
+            .order(ByteOrder.nativeOrder()).asIntBuffer();
+    indexBuffer.put(indices).position(0);
+
+    // Create vertex buffers
+    VertexBuffer[] vertexBuffers = {
+            new VertexBuffer(render, 3, vertexBuffer),
+            new VertexBuffer(render, 2, texCoordBuffer)
+    };
+
+    // Create index buffer
+    IndexBuffer indexBuf = new IndexBuffer(render, indexBuffer);
+
+    // Create mesh object
+    return new Mesh(render, PrimitiveMode.TRIANGLES, indexBuf, vertexBuffers);
+  }
+
+
 
   @Override
   public void close() {

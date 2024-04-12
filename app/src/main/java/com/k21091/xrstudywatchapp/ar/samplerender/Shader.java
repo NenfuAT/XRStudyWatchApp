@@ -146,18 +146,30 @@ public class Shader implements Closeable {
    *     values
    */
   public static Shader createFromAssets(
-      SampleRender render,
-      String vertexShaderFileName,
-      String fragmentShaderFileName,
-      Map<String, String> defines)
-      throws IOException {
+          SampleRender render,
+          String vertexShaderFileName,
+          String fragmentShaderFileName,
+          Map<String, String> defines)
+          throws IOException {
     AssetManager assets = render.getAssets();
-    return new Shader(
-        render,
-        inputStreamToString(assets.open(vertexShaderFileName)),
-        inputStreamToString(assets.open(fragmentShaderFileName)),
-        defines);
+    Log.d("ShaderLoader", "Assets manager: " + assets);
+    // ファイル名をログに出力
+    Log.d("ShaderLoader", "Loading vertex shader from: " + vertexShaderFileName);
+    Log.d("ShaderLoader", "Loading fragment shader from: " + fragmentShaderFileName);
+
+    // シェーダーを作成
+    Shader shader = new Shader(
+            render,
+            inputStreamToString(assets.open(vertexShaderFileName)),
+            inputStreamToString(assets.open(fragmentShaderFileName)),
+            defines);
+
+    // シェーダーの作成が完了したことをログに出力
+    Log.d("ShaderLoader", "Shader created successfully");
+
+    return shader;
   }
+
 
   @Override
   public void close() {
@@ -614,24 +626,31 @@ public class Shader implements Closeable {
   private static int createShader(int type, String code) {
     int shaderId = GLES30.glCreateShader(type);
     GLError.maybeThrowGLException("Shader creation failed", "glCreateShader");
+
     GLES30.glShaderSource(shaderId, code);
     GLError.maybeThrowGLException("Shader source failed", "glShaderSource");
+
     GLES30.glCompileShader(shaderId);
     GLError.maybeThrowGLException("Shader compilation failed", "glCompileShader");
 
     final int[] compileStatus = new int[1];
     GLES30.glGetShaderiv(shaderId, GLES30.GL_COMPILE_STATUS, compileStatus, 0);
+
     if (compileStatus[0] == GLES30.GL_FALSE) {
       String infoLog = GLES30.glGetShaderInfoLog(shaderId);
-      GLError.maybeLogGLError(
-          Log.WARN, TAG, "Failed to retrieve shader info log", "glGetShaderInfoLog");
+      Log.e(TAG, "Shader compilation failed: " + infoLog);
+
+      GLError.maybeLogGLError(Log.WARN, TAG, "Failed to retrieve shader info log", "glGetShaderInfoLog");
       GLES30.glDeleteShader(shaderId);
       GLError.maybeLogGLError(Log.WARN, TAG, "Failed to free shader", "glDeleteShader");
+
       throw new GLException(0, "Shader compilation failed: " + infoLog);
     }
 
+    Log.i(TAG, "Shader compiled successfully");
     return shaderId;
   }
+
 
   private static String createShaderDefinesCode(Map<String, String> defines) {
     if (defines == null) {

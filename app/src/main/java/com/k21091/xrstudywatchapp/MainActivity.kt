@@ -1,8 +1,13 @@
 package com.k21091.xrstudywatchapp
 
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -13,16 +18,25 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
@@ -38,11 +52,22 @@ import com.k21091.xrstudywatchapp.ar.helpers.InstantPlacementSettings
 import com.k21091.xrstudywatchapp.ar.samplerender.SampleRender
 import com.k21091.xrstudywatchapp.ar.kotlin.ArRenderer
 import com.k21091.xrstudywatchapp.ar.kotlin.ArView
+import com.k21091.xrstudywatchapp.ar.kotlin.ObjectRenderer
+import com.k21091.xrstudywatchapp.service.LocationService
+import com.k21091.xrstudywatchapp.service.SpotScanService
 import com.k21091.xrstudywatchapp.ui.theme.XRStudyWatchAppTheme
+import com.k21091.xrstudywatchapp.util.areaObject
+import com.k21091.xrstudywatchapp.util.imageFileName
+import com.k21091.xrstudywatchapp.util.imageFilePath
+import com.k21091.xrstudywatchapp.util.spotObject
+import com.k21091.xrstudywatchapp.view.LoginView
 import com.k21091.xrstudywatchapp.view.UiView
+import com.k21091.xrstudywatchapp.view.getPathFromUri
 import com.k21091.xrstudywatchapp.view.selectedImageBitmapState
 import pub.devrel.easypermissions.EasyPermissions
 import java.io.IOException
+
+
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -52,6 +77,7 @@ class MainActivity : ComponentActivity() {
     lateinit var arCoreSessionHelper: ARCoreSessionLifecycleHelper
     lateinit var view: ArView
     lateinit var renderer: ArRenderer
+    //lateinit var renderer: ObjectRenderer
 
     //private var selectedImageBitmapState = mutableStateOf<ImageBitmap?>(null)
     lateinit var getContent: ActivityResultLauncher<String>
@@ -63,6 +89,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        createNotificationChannel()
+        val intent = Intent(this, LocationService::class.java)
+        startForegroundService(intent)
         val permissions = arrayOf(
             Manifest.permission.ACCESS_WIFI_STATE,
             Manifest.permission.BLUETOOTH_ADMIN ,
@@ -72,7 +101,13 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.BLUETOOTH_ADVERTISE,
             Manifest.permission.NEARBY_WIFI_DEVICES,
-            Manifest.permission.BLUETOOTH_CONNECT
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.INTERNET,
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission. WRITE_EXTERNAL_STORAGE,
+            Manifest.permission. READ_EXTERNAL_STORAGE,
+            Manifest.permission.CHANGE_WIFI_STATE,
+            Manifest.permission.POST_NOTIFICATIONS
         )
 
         //許可したいpermissionを許可できるように
@@ -81,9 +116,12 @@ class MainActivity : ComponentActivity() {
         }
         // getContent を初期化する
         getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            imageFilePath.value= getPathFromUri(this, uri!!).toString()
+            imageFileName.value= imageFilePath.value.substring(imageFilePath.value.lastIndexOf("/") + 1)
             Log.d("MainActivity", "Selected image bitmap: $selectedImageBitmapState")
             uri?.let { selectedImageBitmapState.value = uriToBitmap(it,this) }
         }
+
 
         // Setup ARCore session lifecycle helper and configuration.
         arCoreSessionHelper = ARCoreSessionLifecycleHelper(this)
@@ -110,6 +148,7 @@ class MainActivity : ComponentActivity() {
 
         // Set up the Hello AR renderer.
         renderer = ArRenderer(this)
+        //renderer = ObjectRenderer(this)
         lifecycle.addObserver(renderer)
 
         // Set up Hello AR UI.
@@ -129,10 +168,35 @@ class MainActivity : ComponentActivity() {
 
         // setContent の後に配置する
         setContent {
-            MainView()
+            Box(modifier = Modifier.fillMaxSize()) {
+                AndroidView(factory = {
+                    view.surfaceView
+                })
+                // NavHostを含むRootコンポーザブル関数を呼び出す
+                Root()
+            }
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        val intent = Intent(this, LocationService::class.java)
+        stopService(Intent(this, SpotScanService::class.java))
+        stopService(intent)
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                LocationService.CHANNEL_ID,
+                "お知らせ",
+                NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "お知らせを通知します。"
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
     // Configure the session, using Lighting Estimation, and Depth mode.
     fun configureSession(session: Session) {
         session.configure(
@@ -193,6 +257,34 @@ class MainActivity : ComponentActivity() {
             null
         }
     }
+
+
+    enum class Screens {
+        LOGIN,
+        MAIN,
+    }
+    @Composable
+    fun Root(modifier: Modifier = Modifier) {
+        // Create NavController
+        val navController = rememberNavController()
+        // Create NavHost
+        NavHost(
+            navController = navController,
+            startDestination =Screens.LOGIN.name
+        ) {
+            composable(Screens.LOGIN.name) {
+                LoginView(
+                    toMain= {navController.navigate(Screens.MAIN.name)},
+                    modifier = modifier
+                )
+            }
+
+            composable(Screens.MAIN.name) {
+                MainView()
+            }
+
+        }
+    }
     @Composable
     fun OpenGLView() {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -202,12 +294,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+
+
     @Composable
     fun MainView() = XRStudyWatchAppTheme {
-        val ui=UiView(getContent)
-        //OpenGLView()
+        DisposableEffect(spotObject.value) {
+            onDispose {
+                println("cahnge")
+                // ここにareaObjectStateの値が変更された時の処理を記述する
+                renderer.objectChanged=true
+            }
+        }
+        val ui=UiView(this,getContent)
         ui.Buttonlayout()
         ui.Menulayout()
+        ui.Searchlayout()
     }
 
     @Preview(showBackground = true)
