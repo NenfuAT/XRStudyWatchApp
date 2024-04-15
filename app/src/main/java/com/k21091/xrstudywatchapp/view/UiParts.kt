@@ -59,6 +59,7 @@ import com.k21091.xrstudywatchapp.R
 import com.k21091.xrstudywatchapp.service.latitude
 import com.k21091.xrstudywatchapp.service.longitude
 import com.k21091.xrstudywatchapp.util.CreateCsv
+import com.k21091.xrstudywatchapp.util.WifiData
 import com.k21091.xrstudywatchapp.util.areaObject
 import com.k21091.xrstudywatchapp.util.buildJsonDataBody
 import com.k21091.xrstudywatchapp.util.buildMultipartFormDataBody
@@ -890,7 +891,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             modifier = Modifier
                                 .wrapContentHeight()
                                 .fillMaxWidth(0.95f),
-                            text = "オブジェクトをアップロード",
+                            text = "研究室情報をアップロード",
                             fontSizeRange = FontSizeRange(min = 20.sp, max = 30.sp),
                             textAlign = TextAlign.Center,
                             maxLines = 1
@@ -901,7 +902,7 @@ class MenuParts(private val ui: UiView, var getContent: ActivityResultLauncher<S
                             modifier = Modifier
                                 .wrapContentHeight()
                                 .fillMaxWidth(0.95f),
-                            text = "近くのオブジェクト",
+                            text = "近くの研究室ポスター",
                             fontSizeRange = FontSizeRange(min = 20.sp, max = 30.sp),
                             textAlign = TextAlign.Center,
                             maxLines = 1
@@ -1536,9 +1537,8 @@ fun CountDownCanvas(
                                 state.value = 2
                             }
                         }
-                        var CreateCsv = CreateCsv(context, 30, "upload")
                         state.value = 1
-                        CreateCsv.createcsvdata {
+                        CreateCsv(context, 30, "upload").createcsvdata {
                             if (ui.uploadButtonChecked.value) {
 
                                 formMap["latitude"] = latitude
